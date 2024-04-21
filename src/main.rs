@@ -13,6 +13,8 @@ use std::str;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+    #[arg(long)]
+    line_break: bool
 }
 
 #[derive(Subcommand)]
@@ -28,6 +30,10 @@ fn main() {
         Commands::Encode => encode_bytes_as_emoji(io::stdin().bytes()),
         Commands::Decode => decode_emoji_to_bytes(io::stdin().bytes())
     };
+
+    if cli.line_break {
+        print!("\n");
+    }
 }
 
 fn usize_to_emoji(u : usize) -> char {
