@@ -26,9 +26,11 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
+    let unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
+
     match &cli.command {
-        Commands::Encode => encode_bytes_as_emoji(io::stdin().bytes()),
-        Commands::Decode => decode_emoji_to_bytes(io::stdin().bytes())
+        Commands::Encode => encode_bytes_as_emoji(unwrapped_std_in),
+        Commands::Decode => decode_emoji_to_bytes(unwrapped_std_in)
     };
 
     if cli.line_break {
@@ -42,12 +44,15 @@ fn usize_to_emoji(u : usize) -> char {
 }
 
 // TODO: is there some way to return an iterator of bytes that can be lazily consumed?
-fn encode_bytes_as_emoji(bs : io::Bytes<io::Stdin>) {
+fn encode_bytes_as_emoji<I>(bs : I)
+    where I : Iterator<Item = u8>
+{
+// fn encode_bytes_as_emoji(bs : io::Bytes<io::Stdin>) {
     let mut input_data : usize = 0;
     let mut defined_bits : u32 = 0;
 
-    for i in bs {
-        let b = i.unwrap();
+    for b in bs {
+        // let b = i.unwrap();
 
         input_data = (input_data << BITS_IN_A_BYTE) | usize::from(b);
         defined_bits += BITS_IN_A_BYTE;
@@ -77,7 +82,9 @@ fn encode_bytes_as_emoji(bs : io::Bytes<io::Stdin>) {
     }
 }
 
-fn decode_emoji_to_bytes(bs : io::Bytes<io::Stdin>) {
+fn decode_emoji_to_bytes<I>(bs : I)
+    where I : Iterator<Item = u8>
+{
     // TODO: Try to move this into a const value so it can be computed during compile time
     let emoji_values : HashMap <char, u32> = 
         HashMap::from_iter(
@@ -92,8 +99,8 @@ fn decode_emoji_to_bytes(bs : io::Bytes<io::Stdin>) {
     let mut accumulated_input_bytes = Vec::new();
     let mut bits_to_truncate : u32 = 0;
 
-    for i in bs {
-        accumulated_input_bytes.push(i.unwrap());
+    for b in bs {
+        accumulated_input_bytes.push(b);
 
         if accumulated_input_bytes.len() < 3 {
             continue;
