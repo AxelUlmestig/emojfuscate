@@ -29,7 +29,11 @@ fn main() {
     let unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
 
     match &cli.command {
-        Commands::Encode => encode_bytes_as_emoji(unwrapped_std_in),
+        Commands::Encode => {
+            for emoji in EncodeBytesAsEmoji::new(unwrapped_std_in) {
+                print!("{}", emoji);
+            }
+        },
         Commands::Decode => decode_emoji_to_bytes(unwrapped_std_in)
     };
 
@@ -41,6 +45,76 @@ fn main() {
 fn usize_to_emoji(u : usize) -> char {
     let emoji_unicode = EMOJI[u];
     return char::from_u32(emoji_unicode).unwrap();
+}
+
+struct EncodeBytesAsEmoji<I>
+where
+    I: Iterator<Item = u8>
+{
+    iter: I,
+    input_data : usize,
+    defined_bits : u32,
+    final_emoji : Option<char>
+}
+
+impl<I> EncodeBytesAsEmoji<I>
+where
+    I: Iterator<Item = u8>
+{
+    pub fn new(iter : I) -> Self {
+        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None }
+    }
+}
+
+impl<I> Iterator for EncodeBytesAsEmoji<I>
+where
+    I: Iterator<Item = u8>
+{
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        loop {
+            let mb = self.iter.next();
+
+            let Some(b) = mb else { break };
+
+            self.input_data = (self.input_data << BITS_IN_A_BYTE) | usize::from(b);
+            self.defined_bits += BITS_IN_A_BYTE;
+
+            if self.defined_bits < BITS_PER_EMOJI {
+                continue;
+            }
+
+            let bits_used = self.defined_bits - BITS_PER_EMOJI;
+            let emoji_index = self.input_data >> bits_used;
+
+            // remove the used bits
+            self.input_data = self.input_data ^ (emoji_index << bits_used);
+            self.defined_bits -= BITS_PER_EMOJI;
+
+            return Some(usize_to_emoji(emoji_index));
+        }
+
+        // If we don't have enough bytes for another emoji we encode the difference in a special
+        // emoji and stash away the remaining information so it will be returned on the next next()
+        if self.defined_bits > 0 {
+            let padding = BITS_PER_EMOJI - self.defined_bits;
+            let truncate_bits_emoji = usize_to_emoji(usize::try_from(MAX_EMOJI_VALUE + padding).unwrap());
+
+            self.defined_bits = 0;
+            self.final_emoji = Some(usize_to_emoji(self.input_data << padding));
+
+            return Some(truncate_bits_emoji);
+        }
+
+        // If we have a stashed final emoji we delete it and return it
+        match self.final_emoji {
+            None => return None,
+            Some(emoji) => {
+                self.final_emoji = None;
+                return Some(emoji);
+            }
+        }
+    }
 }
 
 // TODO: is there some way to return an iterator of bytes that can be lazily consumed?
