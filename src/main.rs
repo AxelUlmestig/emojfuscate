@@ -34,7 +34,14 @@ fn main() {
                 print!("{}", emoji);
             }
         },
-        Commands::Decode => decode_emoji_to_bytes(unwrapped_std_in)
+        Commands::Decode => {
+            for byte in DecodeEmojiToBytes::new(unwrapped_std_in) {
+                // TODO: is there a less hacky way than wrapping a single byte in an array?
+                io::stdout().write(&[byte]).unwrap();
+            }
+
+            io::stdout().flush().unwrap();
+        }
     };
 
     if cli.line_break {
@@ -74,7 +81,6 @@ where
     fn next(&mut self) -> Option<char> {
         loop {
             let mb = self.iter.next();
-
             let Some(b) = mb else { break };
 
             self.input_data = (self.input_data << BITS_IN_A_BYTE) | usize::from(b);
@@ -117,123 +123,106 @@ where
     }
 }
 
-// TODO: is there some way to return an iterator of bytes that can be lazily consumed?
-fn encode_bytes_as_emoji<I>(bs : I)
-    where I : Iterator<Item = u8>
+
+struct DecodeEmojiToBytes<I>
+where
+    I: Iterator<Item = u8>
 {
-// fn encode_bytes_as_emoji(bs : io::Bytes<io::Stdin>) {
-    let mut input_data : usize = 0;
-    let mut defined_bits : u32 = 0;
+    iter: I,
+    accumulated_data : u32,
+    defined_bits : u32,
+    accumulated_input_bytes : Vec<u8>,
+    bits_to_truncate : u32,
+    emoji_values : HashMap <char, u32>
+}
 
-    for b in bs {
-        // let b = i.unwrap();
-
-        input_data = (input_data << BITS_IN_A_BYTE) | usize::from(b);
-        defined_bits += BITS_IN_A_BYTE;
-
-        if defined_bits < BITS_PER_EMOJI {
-            continue;
-        }
-
-        let bits_used = defined_bits - BITS_PER_EMOJI;
-        let emoji_index = input_data >> bits_used;
-
-        // remove the used bits
-        input_data = input_data ^ (emoji_index << bits_used);
-        defined_bits -= BITS_PER_EMOJI;
-
-        print!("{}", usize_to_emoji(emoji_index));
-    }
-
-    if defined_bits > 0 {
-        let padding = BITS_PER_EMOJI - defined_bits;
-        let truncate_bits_emoji = usize_to_emoji(usize::try_from(MAX_EMOJI_VALUE + padding).unwrap());
-        print!(
-            "{}{}",
-            truncate_bits_emoji,
-            usize_to_emoji(input_data << padding)
-        );
+impl<I> DecodeEmojiToBytes<I>
+where
+    I: Iterator<Item = u8>
+{
+    pub fn new(iter : I) -> Self {
+        Self
+            { iter
+            , accumulated_data : 0
+            , defined_bits : 0
+            , accumulated_input_bytes : Vec::new()
+            , bits_to_truncate : 0
+            , emoji_values :
+                HashMap::from_iter(
+                    EMOJI
+                        .iter()
+                        .enumerate()
+                        .map(|(i, unicode)| (char::from_u32(*unicode).unwrap(), u32::try_from(i).unwrap()))
+                )
+            }
     }
 }
 
-fn decode_emoji_to_bytes<I>(bs : I)
-    where I : Iterator<Item = u8>
+
+impl<I> Iterator for DecodeEmojiToBytes<I>
+where
+    I: Iterator<Item = u8>
 {
-    // TODO: Try to move this into a const value so it can be computed during compile time
-    let emoji_values : HashMap <char, u32> = 
-        HashMap::from_iter(
-            EMOJI
-                .iter()
-                .enumerate()
-                .map(|(i, unicode)| (char::from_u32(*unicode).unwrap(), u32::try_from(i).unwrap()))
-        );
+    type Item = u8;
+    fn next(&mut self) -> Option<u8> {
+        loop {
+            if self.defined_bits >= BITS_IN_A_BYTE {
+                let u32_byte_to_output = self.accumulated_data >> (self.defined_bits - BITS_IN_A_BYTE);
+                self.accumulated_data = self.accumulated_data ^ (u32_byte_to_output << (self.defined_bits - BITS_IN_A_BYTE));
+                let [byte_to_output, _, _, _] = u32_byte_to_output.to_ne_bytes();
+                self.defined_bits -= BITS_IN_A_BYTE;
 
-    let mut accumulated_data : u32 = 0;
-    let mut defined_bits : u32 = 0;
-    let mut accumulated_input_bytes = Vec::new();
-    let mut bits_to_truncate : u32 = 0;
+                return Some(byte_to_output);
+            }
 
-    for b in bs {
-        accumulated_input_bytes.push(b);
+            let mb = self.iter.next();
+            let Some(b) = mb else { return None };
 
-        if accumulated_input_bytes.len() < 3 {
-            continue;
-        }
+            self.accumulated_input_bytes.push(b);
 
-        if accumulated_input_bytes.len() > 5 {
-            panic!("accumulated_input_bytes.len() > 5");
-        }
+            if self.accumulated_input_bytes.len() < 3 {
+                continue;
+            }
 
-        // println!("accumulated_input_bytes: {:?}", accumulated_input_bytes);
+            if self.accumulated_input_bytes.len() > 5 {
+                panic!("accumulated_input_bytes.len() > 5");
+            }
 
-        let emoji =
-            match str::from_utf8(&accumulated_input_bytes) {
-                Ok(s) => s.chars().nth(0).unwrap(),
-                Err(_) => continue
-            };
+            let emoji =
+                match str::from_utf8(&self.accumulated_input_bytes) {
+                    Ok(s) => s.chars().nth(0).unwrap(),
+                    Err(_) => continue
+                };
 
-        // delete the accumulated bytes
-        accumulated_input_bytes.truncate(0);
-
-        let emoji_value =
-            match emoji_values.get(&emoji) {
-                Some(x) => x,
-                None => panic!("Unexpected input character: {}", emoji)
-            };
+            // delete the accumulated bytes
+            self.accumulated_input_bytes.truncate(0);
 
 
-        // println!("emoji: {}, emoji_value: {}", emoji, *emoji_value);
+            let emoji_value =
+                match self.emoji_values.get(&emoji) {
+                    Some(x) => x,
+                    None => panic!("Unexpected input character: {}", emoji)
+                };
 
-        // emoji beyond 2047 are used to indicate that the next emoji produces too many bits. This
-        // happens at the end of the encoded message
-        if *emoji_value >= MAX_EMOJI_VALUE {
-            bits_to_truncate = *emoji_value - MAX_EMOJI_VALUE;
-            //println!("emoji: {}, bits_to_truncate: {}", emoji, bits_to_truncate);
-            continue;
-        }
+            // emoji beyond 2047 are used to indicate that the next emoji produces too many bits. This
+            // happens at the end of the encoded message
+            if *emoji_value >= MAX_EMOJI_VALUE {
+                self.bits_to_truncate = *emoji_value - MAX_EMOJI_VALUE;
+                //println!("emoji: {}, bits_to_truncate: {}", emoji, bits_to_truncate);
+                continue;
+            }
 
-        accumulated_data = (accumulated_data << BITS_PER_EMOJI) | emoji_value;
-        defined_bits += BITS_PER_EMOJI;
+            self.accumulated_data = (self.accumulated_data << BITS_PER_EMOJI) | emoji_value;
+            self.defined_bits += BITS_PER_EMOJI;
 
-        // TODO: combine this with the above statement
-        accumulated_data = accumulated_data >> bits_to_truncate;
-        bits_to_truncate = 0;
-
-        while defined_bits >= BITS_IN_A_BYTE {
-            let u32_byte_to_output = accumulated_data >> (defined_bits - BITS_IN_A_BYTE);
-            accumulated_data = accumulated_data ^ (u32_byte_to_output << (defined_bits - BITS_IN_A_BYTE));
-            let [byte_to_output, _, _, _] = u32_byte_to_output.to_ne_bytes();
-            defined_bits -= BITS_IN_A_BYTE;
-
-            // println!("stdout byte: {}", byte_to_output);
-
-            // TODO: is there a less hacky way than wrapping a single byte in an array?
-            io::stdout().write(&[byte_to_output]).unwrap();
+            // TODO: combine this with the above statement
+            self.accumulated_data = self.accumulated_data >> self.bits_to_truncate;
+            self.bits_to_truncate = 0;
         }
     }
-
-    io::stdout().flush().unwrap();
 }
+
+
 
 const BITS_IN_A_BYTE : u32 = 8;
 const BITS_PER_EMOJI : u32 = 10;
