@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::convert::TryFrom;
 use std::str;
+use std::io::BufWriter;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -28,31 +29,56 @@ fn main() {
 
     let unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
 
+    let mut stream = BufWriter::new(io::stdout());
+
     match &cli.command {
         Commands::Encode => {
             for emoji in EncodeBytesAsEmoji::new(unwrapped_std_in) {
-                print!("{}", emoji);
+                stream.write(&emoji.to_string().as_bytes()).unwrap();
             }
         },
         Commands::Decode => {
             for byte in DecodeEmojiToBytes::new(unwrapped_std_in) {
-                // TODO: is there a less hacky way than wrapping a single byte in an array?
-                io::stdout().write(&[byte]).unwrap();
+                stream.write(&[byte]).unwrap();
             }
 
-            io::stdout().flush().unwrap();
         }
     };
 
     if cli.line_break {
-        print!("\n");
+        stream.write("\n".as_bytes()).unwrap();
     }
+
+    io::stdout().flush().unwrap();
 }
 
 fn usize_to_emoji(u : usize) -> char {
     let emoji_unicode = EMOJI[u];
     return char::from_u32(emoji_unicode).unwrap();
 }
+
+trait ToEmojiStream<I>
+where
+    I: Iterator<Item = u8>
+{
+    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I>;
+}
+
+/*
+impl<I : Iterator<Item = u8>> ToEmojiStream<I> for I
+{
+    fn to_emoji_stream(self) -> ToEmojiStream<I> { EncodeBytesAsEmoji::new(self) }
+}
+*/
+
+/*
+fn foo<I>(&self : I) -> EncodeBytesAsEmoji<I>
+where
+    I: Iterator<Item = u8>
+{
+    return EncodeBytesAsEmoji::new(self);
+}
+*/
 
 struct EncodeBytesAsEmoji<I>
 where
