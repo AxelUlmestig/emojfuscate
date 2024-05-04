@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::io;
 use std::io::Read;
 use std::io::Write;
@@ -8,6 +8,7 @@ use std::convert::TryFrom;
 use std::str;
 use std::io::BufWriter;
 use uuid::Uuid;
+use uuid::Builder;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -15,15 +16,45 @@ use uuid::Uuid;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
-    #[arg(long)]
-    line_break: bool
+    #[arg(short, long)]
+    line_break: bool,
+    // #[clap(value_enum, default_value_t=DataType::Text)]
+    // data_type: DataType
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    Encode,
-    Decode,
+    Encode { data_type: Option<DataType> },
+    Decode { data_type: Option<DataType> },
 }
+
+#[derive(ValueEnum, Clone, Debug)]
+enum DataType {
+    Text,
+    UUID
+}
+
+/*
+#[derive(ValueEnum, Clone, Debug)]
+enum InputData {
+    StdIn,
+    TextInput { value: String },
+}
+*/
+
+/*
+impl FromStr for DataType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_ascii_lowercase().as_str() {
+            "text" => Ok(DataType::Text),
+            "uuid" => Ok(DataType::UUID),
+            _ => Err("error"),
+        }
+    }
+}
+*/
 
 fn main() {
     let cli = Cli::parse();
@@ -33,14 +64,36 @@ fn main() {
     let mut stream = BufWriter::new(io::stdout());
 
     match &cli.command {
-        Commands::Encode => {
-            for emoji in unwrapped_std_in.to_emoji_stream() {
-                stream.write(emoji.to_string().as_bytes()).unwrap();
+        Commands::Encode { data_type } => {
+            match &data_type {
+                Some(DataType::UUID) => {
+                    let uuid = Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap();
+
+                    // TODO: why can't I just uuid.to_emoji_stream() ?
+                    for emoji in uuid.into_bytes().into_iter().to_emoji_stream() {
+                        stream.write(emoji.to_string().as_bytes()).unwrap();
+                    }
+                },
+                _ => {
+                    for emoji in unwrapped_std_in.to_emoji_stream() {
+                        stream.write(emoji.to_string().as_bytes()).unwrap();
+                    }
+                }
             }
         },
-        Commands::Decode => {
-            for byte in unwrapped_std_in.from_emoji_stream() {
-                stream.write(&[byte]).unwrap();
+        Commands::Decode {data_type } => {
+            match &data_type {
+                Some(DataType::UUID) => {
+                    // TODO: figure out how to put values in intermediate variables
+                    let uuid = Builder::from_slice(unwrapped_std_in.from_emoji_stream().collect::<Vec<u8>>().as_slice()).unwrap().into_uuid();
+
+                    stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
+                },
+                _ => {
+                    for byte in unwrapped_std_in.from_emoji_stream() {
+                        stream.write(&[byte]).unwrap();
+                    }
+                }
             }
         }
     };
@@ -91,6 +144,13 @@ impl<I : Iterator<Item = u8>> ToEmojiStream<I> for I
 {
     fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
 }
+
+/*
+impl<I : Iterator<Item = u8>> ToEmojiStream<I> for Uuid
+{
+    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
+}
+*/
 
 trait FromEmojiStream<I>
 where
