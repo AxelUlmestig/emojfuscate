@@ -7,6 +7,7 @@ use std::iter::FromIterator;
 use std::convert::TryFrom;
 use std::str;
 use std::io::BufWriter;
+use uuid::Uuid;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -33,15 +34,14 @@ fn main() {
 
     match &cli.command {
         Commands::Encode => {
-            for emoji in EncodeBytesAsEmoji::new(unwrapped_std_in) {
-                stream.write(&emoji.to_string().as_bytes()).unwrap();
+            for emoji in unwrapped_std_in.to_emoji_stream() {
+                stream.write(emoji.to_string().as_bytes()).unwrap();
             }
         },
         Commands::Decode => {
-            for byte in DecodeEmojiToBytes::new(unwrapped_std_in) {
+            for byte in unwrapped_std_in.from_emoji_stream() {
                 stream.write(&[byte]).unwrap();
             }
-
         }
     };
 
@@ -57,6 +57,29 @@ fn usize_to_emoji(u : usize) -> char {
     return char::from_u32(emoji_unicode).unwrap();
 }
 
+/*
+struct Emojis(String);
+
+impl Emojis
+{
+    pub fn to_string(&self) -> &str { 
+        &self.0
+    } 
+}
+
+trait ToEmojis
+{
+    fn to_emojis(&self) -> Emojis;
+}
+
+impl ToEmojis for Uuid {
+    fn to_emojis(&self) -> Emojis {
+        return EncodeBytesAsEmoji::new(self.as_bytes().iter()).collect();
+    }
+}
+*/
+
+
 trait ToEmojiStream<I>
 where
     I: Iterator<Item = u8>
@@ -64,21 +87,22 @@ where
     fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I>;
 }
 
-/*
 impl<I : Iterator<Item = u8>> ToEmojiStream<I> for I
 {
-    fn to_emoji_stream(self) -> ToEmojiStream<I> { EncodeBytesAsEmoji::new(self) }
+    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
 }
-*/
 
-/*
-fn foo<I>(&self : I) -> EncodeBytesAsEmoji<I>
+trait FromEmojiStream<I>
 where
     I: Iterator<Item = u8>
 {
-    return EncodeBytesAsEmoji::new(self);
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I>;
 }
-*/
+
+impl<I : Iterator<Item = u8>> FromEmojiStream<I> for I
+{
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I> { DecodeEmojiToBytes::new(self) }
+}
 
 struct EncodeBytesAsEmoji<I>
 where
