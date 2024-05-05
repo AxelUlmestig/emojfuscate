@@ -24,8 +24,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    Encode { data_type: Option<DataType> },
-    Decode { data_type: Option<DataType> },
+    Encode { data_type: DataType, input: String },
+    Decode { data_type: DataType, input: String },
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -64,34 +64,61 @@ fn main() {
     let mut stream = BufWriter::new(io::stdout());
 
     match &cli.command {
-        Commands::Encode { data_type } => {
+        Commands::Encode { data_type, input } => {
             match &data_type {
-                Some(DataType::UUID) => {
-                    let uuid = Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap();
+                DataType::UUID => {
+                    let uuid =
+                        match input.as_str() {
+                            "-" => {Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap() },
+                            uuid_string => { Uuid::parse_str(uuid_string).unwrap() }
+                        };
 
                     // TODO: why can't I just uuid.to_emoji_stream() ?
                     for emoji in uuid.into_bytes().into_iter().to_emoji_stream() {
                         stream.write(emoji.to_string().as_bytes()).unwrap();
                     }
                 },
-                _ => {
-                    for emoji in unwrapped_std_in.to_emoji_stream() {
-                        stream.write(emoji.to_string().as_bytes()).unwrap();
+                DataType::Text => {
+                    match input.as_str() {
+                        "-" => {
+                            for emoji in unwrapped_std_in.to_emoji_stream() {
+                                stream.write(emoji.to_string().as_bytes()).unwrap();
+                            }
+                        },
+                        some_string => {
+                            for emoji in some_string.bytes().to_emoji_stream() {
+                                stream.write(emoji.to_string().as_bytes()).unwrap();
+                            }
+                        }
                     }
                 }
             }
         },
-        Commands::Decode {data_type } => {
+        Commands::Decode { data_type, input } => {
             match &data_type {
-                Some(DataType::UUID) => {
-                    // TODO: figure out how to put values in intermediate variables
-                    let uuid = Builder::from_slice(unwrapped_std_in.from_emoji_stream().collect::<Vec<u8>>().as_slice()).unwrap().into_uuid();
+                DataType::UUID => {
+                    let bytes =
+                        match input.as_str() {
+                            "-" => unwrapped_std_in.from_emoji_stream().collect::<Vec<u8>>(),
+                            some_string => some_string.bytes().from_emoji_stream().collect::<Vec<u8>>()
+                        };
+
+                    let uuid = Builder::from_slice(bytes.as_slice()).unwrap().into_uuid();
 
                     stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
                 },
-                _ => {
-                    for byte in unwrapped_std_in.from_emoji_stream() {
-                        stream.write(&[byte]).unwrap();
+                DataType::Text => {
+                    match input.as_str() {
+                        "-" => {
+                            for byte in unwrapped_std_in.from_emoji_stream() {
+                                stream.write(&[byte]).unwrap();
+                            }
+                        },
+                        some_string => {
+                            for byte in some_string.bytes().from_emoji_stream() {
+                                stream.write(&[byte]).unwrap();
+                            }
+                        }
                     }
                 }
             }
@@ -115,9 +142,9 @@ struct Emojis(String);
 
 impl Emojis
 {
-    pub fn to_string(&self) -> &str { 
+    pub fn to_string(&self) -> &str {
         &self.0
-    } 
+    }
 }
 
 trait ToEmojis
@@ -350,7 +377,7 @@ static EMOJI_HASHMAP : HashMap <char, u32> =
 
 /*
 const EMOJI_HASHMAP : HashMap <char, u32> = loop {
-    
+
 };
 */
 
