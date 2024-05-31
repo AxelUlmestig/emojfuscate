@@ -8,9 +8,6 @@ use uuid::Uuid;
 use uuid::Builder;
 use hex;
 
-// mod constants;
-// use crate::constants;
-
 use emojfuscate::to_emoji_stream::ToEmojiStream;
 use emojfuscate::from_emoji_stream::FromEmojiStream;
 use emojfuscate::hex_stream::HexStream;
@@ -75,12 +72,11 @@ fn main() {
                 DataType::UUID => {
                     let uuid =
                         match input.as_str() {
-                            "-" => {Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap() },
+                            "-" => { Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap() },
                             uuid_string => { Uuid::parse_str(uuid_string).unwrap() }
                         };
 
-                    // TODO: why can't I just uuid.to_emoji_stream() ?
-                    for emoji in uuid.into_bytes().into_iter().to_emoji_stream() {
+                    for emoji in uuid.to_emoji_stream() {
                         stream.write(emoji.to_string().as_bytes()).unwrap();
                     }
                 },
@@ -106,9 +102,12 @@ fn main() {
                             }
                         },
                         some_string => {
+                            stream.write(some_string.bytes().to_emoji_string().as_bytes()).unwrap();
+                            /*
                             for emoji in some_string.bytes().to_emoji_stream() {
                                 stream.write(emoji.to_string().as_bytes()).unwrap();
                             }
+                            */
                         }
                     }
                 }

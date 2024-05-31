@@ -20,6 +20,8 @@ const EMOJI_HASHMAP : HashMap <char, u32> = loop {
 */
 
 
+// This code isn't dead at all, I'm not sure why Rust is complaining about it
+#[allow(dead_code)]
 pub fn usize_to_emoji(u : usize) -> char {
     let emoji_unicode = EMOJI[u];
     return char::from_u32(emoji_unicode).unwrap();

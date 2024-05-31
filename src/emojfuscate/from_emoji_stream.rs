@@ -16,6 +16,11 @@ impl<I : Iterator<Item = u8>> FromEmojiStream<I> for I
     fn from_emoji_stream(self) -> DecodeEmojiToBytes<I> { DecodeEmojiToBytes::new(self) }
 }
 
+impl FromEmojiStream<std::vec::IntoIter<u8>> for String
+{
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().from_emoji_stream() }
+}
+
 pub struct DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>

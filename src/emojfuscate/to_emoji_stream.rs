@@ -1,16 +1,38 @@
-#[path = "constants.rs"]
-mod constants;
+
+use uuid::Uuid;
+use core::array::IntoIter;
+// use std::vec;
+// use std::str::Bytes;
+
+use super::constants;
 
 pub trait ToEmojiStream<I>
 where
     I: Iterator<Item = u8>
 {
     fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I>;
+
+    fn to_emoji_string(self) -> String where Self: Sized {
+        return self.to_emoji_stream().collect();
+    }
 }
 
 impl<I : Iterator<Item = u8>> ToEmojiStream<I> for I
 {
     fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
+}
+
+// impl<'a> ToEmojiStream<Bytes<'a>> for String
+// impl ToEmojiStream<Vec<u8>> for String
+impl ToEmojiStream<std::vec::IntoIter<u8>> for String
+{
+    // fn to_emoji_stream(self) -> EncodeBytesAsEmoji<Bytes<'a>> { self.bytes().to_emoji_stream() }
+    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().to_emoji_stream() }
+    // fn to_emoji_stream(self) -> ToEmojiStream<Vec<u8>> { self.into_iter().to_emoji_stream() }
+}
+
+impl ToEmojiStream<IntoIter<u8, 16>> for Uuid {
+    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<IntoIter<u8, 16>> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
 }
 
 pub struct EncodeBytesAsEmoji<I>
