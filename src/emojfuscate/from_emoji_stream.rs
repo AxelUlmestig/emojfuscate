@@ -46,16 +46,12 @@ impl<I : Iterator<Item = u8>> ConstructFromEmojiStream<I> for I
     }
 }
 
-/*
-impl<A> ConstructFromEmojiStream<A, std::vec::IntoIter<u8>> for String
-where
-    A: ConstructFromEmoji<A, std::vec::IntoIter<u8>>
+impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String
 {
     fn from_emoji_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
         self.into_bytes().into_iter().from_emoji_stream()
     }
 }
-*/
 
 pub trait ConstructFromEmoji<A, I>
 where

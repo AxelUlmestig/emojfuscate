@@ -16,7 +16,7 @@ mod tests {
     fn emojfuscate_string() {
         let original_message = "Karin är söt <3".to_string();
         let emojified = original_message.clone().to_emoji_string();
-        let roundtrip_message : String = emojified.bytes().from_emoji();
+        let roundtrip_message : String = emojified.from_emoji();
         assert_eq!(roundtrip_message, original_message);
     }
 
@@ -25,7 +25,7 @@ mod tests {
         let original_message = uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8");
         // let original_message : Uuid = Uuid::new_v4();
         let emojified = original_message.clone().to_emoji_string();
-        let roundtrip_message : uuid::Uuid = emojified.bytes().from_emoji();
+        let roundtrip_message : uuid::Uuid = emojified.from_emoji();
         assert_eq!(roundtrip_message, original_message);
     }
 }
