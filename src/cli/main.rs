@@ -5,11 +5,10 @@ use std::io::Write;
 use std::str;
 use std::io::BufWriter;
 use uuid::Uuid;
-use uuid::Builder;
 use hex;
 
 use emojfuscate::to_emoji_stream::ToEmojiStream;
-use emojfuscate::from_emoji_stream::FromEmojiStream;
+use emojfuscate::from_emoji_stream::{ConstructFromEmojiStream, FromEmoji};
 use emojfuscate::hex_stream::HexStream;
 
 #[derive(Parser)]
@@ -36,28 +35,6 @@ enum DataType {
     UUID,
     Hexadecimal
 }
-
-/*
-#[derive(ValueEnum, Clone, Debug)]
-enum InputData {
-    StdIn,
-    TextInput { value: String },
-}
-*/
-
-/*
-impl FromStr for DataType {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_ascii_lowercase().as_str() {
-            "text" => Ok(DataType::Text),
-            "uuid" => Ok(DataType::UUID),
-            _ => Err("error"),
-        }
-    }
-}
-*/
 
 fn main() {
     let cli = Cli::parse();
@@ -103,11 +80,6 @@ fn main() {
                         },
                         some_string => {
                             stream.write(some_string.bytes().to_emoji_string().as_bytes()).unwrap();
-                            /*
-                            for emoji in some_string.bytes().to_emoji_stream() {
-                                stream.write(emoji.to_string().as_bytes()).unwrap();
-                            }
-                            */
                         }
                     }
                 }
@@ -116,13 +88,11 @@ fn main() {
         Commands::Decode { data_type, input } => {
             match &data_type {
                 DataType::UUID => {
-                    let bytes =
+                    let uuid : Uuid = 
                         match input.as_str() {
-                            "-" => unwrapped_std_in.from_emoji_stream().collect::<Vec<u8>>(),
-                            some_string => some_string.bytes().from_emoji_stream().collect::<Vec<u8>>()
+                            "-" => unwrapped_std_in.from_emoji(),
+                            some_string => some_string.bytes().from_emoji()
                         };
-
-                    let uuid = Builder::from_slice(bytes.as_slice()).unwrap().into_uuid();
 
                     stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
                 },
@@ -164,29 +134,4 @@ fn main() {
 
     io::stdout().flush().unwrap();
 }
-
-/*
-struct Emojis(String);
-
-impl Emojis
-{
-    pub fn to_string(&self) -> &str {
-        &self.0
-    }
-}
-
-trait ToEmojis
-{
-    fn to_emojis(&self) -> Emojis;
-}
-
-impl ToEmojis for Uuid {
-    fn to_emojis(&self) -> Emojis {
-        return EncodeBytesAsEmoji::new(self.as_bytes().iter()).collect();
-    }
-}
-*/
-
-
-
 

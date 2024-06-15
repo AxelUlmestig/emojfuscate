@@ -1,25 +1,96 @@
 use std::collections::HashMap;
 use std::str;
+use uuid::Uuid;
+use uuid::Builder;
 
 #[path = "constants.rs"]
 mod constants;
 
-pub trait FromEmojiStream<I>
+pub trait ConstructFromEmojiStream<I>
 where
     I: Iterator<Item = u8>
 {
     fn from_emoji_stream(self) -> DecodeEmojiToBytes<I>;
+
+    /*
+    fn from_emoji(self) -> A where Self : Sized {
+        A::construct_from_emoji(self.from_emoji_stream())
+    }
+    */
 }
 
-impl<I : Iterator<Item = u8>> FromEmojiStream<I> for I
+pub trait FromEmoji<A, I>
+where
+    Self: ConstructFromEmojiStream<I>,
+    A: ConstructFromEmoji<A, I>,
+    I: Iterator<Item = u8>
 {
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I> { DecodeEmojiToBytes::new(self) }
+    fn from_emoji(self) -> A where Self : Sized;
 }
 
-impl FromEmojiStream<std::vec::IntoIter<u8>> for String
+impl<A, B, I> FromEmoji<B, I> for A
+where
+    Self: ConstructFromEmojiStream<I>,
+    B: ConstructFromEmoji<B, I>,
+    I: Iterator<Item = u8>
 {
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().from_emoji_stream() }
+    fn from_emoji(self) -> B where Self : Sized {
+        B::construct_from_emoji(self.from_emoji_stream())
+    }
 }
+
+impl<I : Iterator<Item = u8>> ConstructFromEmojiStream<I> for I
+{
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I> {
+        DecodeEmojiToBytes::new(self)
+    }
+}
+
+/*
+impl<A> ConstructFromEmojiStream<A, std::vec::IntoIter<u8>> for String
+where
+    A: ConstructFromEmoji<A, std::vec::IntoIter<u8>>
+{
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
+        self.into_bytes().into_iter().from_emoji_stream()
+    }
+}
+*/
+
+pub trait ConstructFromEmoji<A, I>
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> A where Self : Sized;
+}
+
+impl<I> ConstructFromEmoji<DecodeEmojiToBytes<I>, I> for DecodeEmojiToBytes<I>
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> DecodeEmojiToBytes<I> {
+        byte_stream
+    }
+}
+
+impl<I> ConstructFromEmoji<Uuid, I> for Uuid
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Uuid {
+        Builder::from_slice(byte_stream.collect::<Vec<u8>>().as_slice()).unwrap().into_uuid()
+    }
+}
+
+impl<I> ConstructFromEmoji<String, I> for String
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> String {
+        String::from_utf8(byte_stream.collect::<Vec<u8>>()).unwrap()
+    }
+}
+
 
 pub struct DecodeEmojiToBytes<I>
 where
