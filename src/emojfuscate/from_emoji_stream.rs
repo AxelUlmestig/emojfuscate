@@ -87,6 +87,15 @@ where
     }
 }
 
+impl<I> ConstructFromEmoji<u8, I> for u8
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> u8 {
+        byte_stream.next().unwrap()
+    }
+}
+
 
 pub struct DecodeEmojiToBytes<I>
 where

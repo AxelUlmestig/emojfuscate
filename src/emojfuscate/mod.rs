@@ -28,4 +28,13 @@ mod tests {
         let roundtrip_message : uuid::Uuid = emojified.from_emoji();
         assert_eq!(roundtrip_message, original_message);
     }
+
+    #[test]
+    fn emojfuscate_u8() {
+        let original_message : u8 = 255;
+        // let original_message : Uuid = Uuid::new_v4();
+        let emojified = original_message.clone().to_emoji_string();
+        let roundtrip_message : u8 = emojified.from_emoji();
+        assert_eq!(roundtrip_message, original_message);
+    }
 }
