@@ -7,6 +7,9 @@ edition = "2021"
 name = "emojfuscate"
 path = "src/emojfuscate/mod.rs"
 
+[dev-dependencies]
+proptest = "1.0.0"
+
 [[bin]]
 name = "emojfuscate-cli"
 path = "src/cli/main.rs"
