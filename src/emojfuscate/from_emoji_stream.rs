@@ -6,35 +6,44 @@ use uuid::Builder;
 #[path = "constants.rs"]
 mod constants;
 
-pub trait ConstructFromEmojiStream<I>
-where
-    I: Iterator<Item = u8>
-{
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I>;
-
-    /*
-    fn from_emoji(self) -> A where Self : Sized {
-        A::construct_from_emoji(self.from_emoji_stream())
-    }
-    */
-}
-
+// fundamental traits
 pub trait FromEmoji<A, I>
 where
     Self: ConstructFromEmojiStream<I>,
     A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>
 {
-    fn from_emoji(self) -> A where Self : Sized;
+    fn from_emoji(self) -> Result<A, FromEmojiError> where Self : Sized;
 }
 
+pub trait ConstructFromEmojiStream<I>
+where
+    I: Iterator<Item = u8>
+{
+    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I>;
+}
+
+pub trait ConstructFromEmoji<A, I>
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError> where Self : Sized;
+}
+
+#[derive(Debug)]
+#[derive(PartialEq)]
+pub enum FromEmojiError {
+    NotEnoughEmoji
+}
+
+// implementations
 impl<A, B, I> FromEmoji<B, I> for A
 where
     Self: ConstructFromEmojiStream<I>,
     B: ConstructFromEmoji<B, I>,
     I: Iterator<Item = u8>
 {
-    fn from_emoji(self) -> B where Self : Sized {
+    fn from_emoji(self) -> Result<B, FromEmojiError> where Self : Sized {
         B::construct_from_emoji(self.from_emoji_stream())
     }
 }
@@ -53,19 +62,12 @@ impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String
     }
 }
 
-pub trait ConstructFromEmoji<A, I>
-where
-    I: Iterator<Item = u8>
-{
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> A where Self : Sized;
-}
-
 impl<I> ConstructFromEmoji<DecodeEmojiToBytes<I>, I> for DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> DecodeEmojiToBytes<I> {
-        byte_stream
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<DecodeEmojiToBytes<I>, FromEmojiError> {
+        Ok(byte_stream)
     }
 }
 
@@ -73,8 +75,11 @@ impl<I> ConstructFromEmoji<Uuid, I> for Uuid
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Uuid {
-        Builder::from_slice(byte_stream.collect::<Vec<u8>>().as_slice()).unwrap().into_uuid()
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<Uuid, FromEmojiError> {
+        match Builder::from_slice(byte_stream.collect::<Vec<u8>>().as_slice()) {
+            Ok(builder) => Ok(builder.into_uuid()),
+            Err(_err) => Err(FromEmojiError::NotEnoughEmoji)
+        }
     }
 }
 
@@ -82,8 +87,8 @@ impl<I> ConstructFromEmoji<String, I> for String
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> String {
-        String::from_utf8(byte_stream.collect::<Vec<u8>>()).unwrap()
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<String, FromEmojiError> {
+        Ok(String::from_utf8(byte_stream.collect::<Vec<u8>>()).unwrap())
     }
 }
 
@@ -91,8 +96,8 @@ impl<I> ConstructFromEmoji<u8, I> for u8
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> u8 {
-        byte_stream.next().unwrap()
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<u8, FromEmojiError> {
+        Ok(byte_stream.next().unwrap())
     }
 }
 

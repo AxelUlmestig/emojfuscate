@@ -6,9 +6,10 @@ use std::str;
 use std::io::BufWriter;
 use uuid::Uuid;
 use hex;
+// use std::process::ExitCode;
 
 use emojfuscate::to_emoji_stream::ToEmojiStream;
-use emojfuscate::from_emoji_stream::{ConstructFromEmojiStream, FromEmoji};
+use emojfuscate::from_emoji_stream::{ConstructFromEmojiStream, FromEmoji, FromEmojiError};
 use emojfuscate::hex_stream::HexStream;
 
 #[derive(Parser)]
@@ -88,13 +89,22 @@ fn main() {
         Commands::Decode { data_type, input } => {
             match &data_type {
                 DataType::UUID => {
-                    let uuid : Uuid = 
+                    let r_uuid : Result<Uuid, FromEmojiError> =
                         match input.as_str() {
                             "-" => unwrapped_std_in.from_emoji(),
                             some_string => some_string.bytes().from_emoji()
                         };
 
-                    stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
+                    match r_uuid {
+                        Ok(uuid) => {
+                            stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
+                        },
+                        Err(FromEmojiError::NotEnoughEmoji) => {
+                            eprintln!("Not enough emoji in input to construct a UUID");
+                            std::process::exit(1);
+                            // return ExitCode::FAILURE;
+                        }
+                    }
                 },
                 DataType::Hexadecimal => {
                     match input.as_str() {
@@ -133,5 +143,7 @@ fn main() {
     }
 
     io::stdout().flush().unwrap();
+
+    // return ExitCode::SUCCESS;
 }
 
