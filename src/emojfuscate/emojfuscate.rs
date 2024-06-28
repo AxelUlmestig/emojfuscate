@@ -6,33 +6,33 @@ use core::array::IntoIter;
 
 use super::constants;
 
-pub trait ToEmojiStream<I>
+pub trait Emojfuscate<I>
 where
     I: Iterator<Item = u8>
 {
-    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I>;
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I>;
 
-    fn to_emoji_string(self) -> String where Self: Sized {
-        return self.to_emoji_stream().collect();
+    fn emojfuscate(self) -> String where Self: Sized {
+        return self.emojfuscate_stream().collect();
     }
 }
 
-impl<I : Iterator<Item = u8>> ToEmojiStream<I> for I
+impl<I : Iterator<Item = u8>> Emojfuscate<I> for I
 {
-    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
 }
 
-impl ToEmojiStream<std::vec::IntoIter<u8>> for String
+impl Emojfuscate<std::vec::IntoIter<u8>> for String
 {
-    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().to_emoji_stream() }
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().emojfuscate_stream() }
 }
 
-impl ToEmojiStream<IntoIter<u8, 16>> for Uuid {
-    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<IntoIter<u8, 16>> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
+impl Emojfuscate<IntoIter<u8, 16>> for Uuid {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<u8, 16>> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
 }
 
-impl ToEmojiStream<std::vec::IntoIter<u8>> for u8 {
-    fn to_emoji_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
+impl Emojfuscate<std::vec::IntoIter<u8>> for u8 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
         EncodeBytesAsEmoji::new(vec![self, 1].into_iter())
     }
 }

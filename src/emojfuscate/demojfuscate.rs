@@ -7,20 +7,20 @@ use uuid::Builder;
 mod constants;
 
 // fundamental traits
-pub trait FromEmoji<A, I>
+pub trait Demojfuscate<A, I>
 where
     Self: ConstructFromEmojiStream<I>,
     A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>
 {
-    fn from_emoji(self) -> Result<A, FromEmojiError> where Self : Sized;
+    fn demojfuscate(self) -> Result<A, FromEmojiError> where Self : Sized;
 }
 
 pub trait ConstructFromEmojiStream<I>
 where
     I: Iterator<Item = u8>
 {
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I>;
+    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<I>;
 }
 
 pub trait ConstructFromEmoji<A, I>
@@ -37,28 +37,28 @@ pub enum FromEmojiError {
 }
 
 // implementations
-impl<A, B, I> FromEmoji<B, I> for A
+impl<A, B, I> Demojfuscate<B, I> for A
 where
     Self: ConstructFromEmojiStream<I>,
     B: ConstructFromEmoji<B, I>,
     I: Iterator<Item = u8>
 {
-    fn from_emoji(self) -> Result<B, FromEmojiError> where Self : Sized {
-        B::construct_from_emoji(self.from_emoji_stream())
+    fn demojfuscate(self) -> Result<B, FromEmojiError> where Self : Sized {
+        B::construct_from_emoji(self.demojfuscate_stream())
     }
 }
 
 impl<I : Iterator<Item = u8>> ConstructFromEmojiStream<I> for I
 {
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<I> {
+    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
     }
 }
 
 impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String
 {
-    fn from_emoji_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
-        self.into_bytes().into_iter().from_emoji_stream()
+    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
+        self.into_bytes().into_iter().demojfuscate_stream()
     }
 }
 

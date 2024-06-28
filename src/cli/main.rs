@@ -8,8 +8,8 @@ use uuid::Uuid;
 use hex;
 // use std::process::ExitCode;
 
-use emojfuscate::to_emoji_stream::ToEmojiStream;
-use emojfuscate::from_emoji_stream::{ConstructFromEmojiStream, FromEmoji, FromEmojiError};
+use emojfuscate::emojfuscate::Emojfuscate;
+use emojfuscate::demojfuscate::{ConstructFromEmojiStream, Demojfuscate, FromEmojiError};
 use emojfuscate::hex_stream::HexStream;
 
 #[derive(Parser)]
@@ -54,19 +54,19 @@ fn main() {
                             uuid_string => { Uuid::parse_str(uuid_string).unwrap() }
                         };
 
-                    for emoji in uuid.to_emoji_stream() {
+                    for emoji in uuid.emojfuscate_stream() {
                         stream.write(emoji.to_string().as_bytes()).unwrap();
                     }
                 },
                 DataType::Hexadecimal => {
                     match input.as_str() {
                         "-" => {
-                            for emoji in HexStream::new(unwrapped_std_in).to_emoji_stream() {
+                            for emoji in HexStream::new(unwrapped_std_in).emojfuscate_stream() {
                                 stream.write(emoji.to_string().as_bytes()).unwrap();
                             }
                         },
                         some_string => {
-                            for emoji in HexStream::new(some_string.bytes()).to_emoji_stream() {
+                            for emoji in HexStream::new(some_string.bytes()).emojfuscate_stream() {
                                 stream.write(emoji.to_string().as_bytes()).unwrap();
                             }
                         }
@@ -75,12 +75,12 @@ fn main() {
                 DataType::Text => {
                     match input.as_str() {
                         "-" => {
-                            for emoji in unwrapped_std_in.to_emoji_stream() {
+                            for emoji in unwrapped_std_in.emojfuscate_stream() {
                                 stream.write(emoji.to_string().as_bytes()).unwrap();
                             }
                         },
                         some_string => {
-                            stream.write(some_string.bytes().to_emoji_string().as_bytes()).unwrap();
+                            stream.write(some_string.bytes().emojfuscate().as_bytes()).unwrap();
                         }
                     }
                 }
@@ -91,8 +91,8 @@ fn main() {
                 DataType::UUID => {
                     let r_uuid : Result<Uuid, FromEmojiError> =
                         match input.as_str() {
-                            "-" => unwrapped_std_in.from_emoji(),
-                            some_string => some_string.bytes().from_emoji()
+                            "-" => unwrapped_std_in.demojfuscate(),
+                            some_string => some_string.bytes().demojfuscate()
                         };
 
                     match r_uuid {
@@ -109,12 +109,12 @@ fn main() {
                 DataType::Hexadecimal => {
                     match input.as_str() {
                         "-" => {
-                            for byte in unwrapped_std_in.from_emoji_stream() {
+                            for byte in unwrapped_std_in.demojfuscate_stream() {
                                 stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
                             }
                         },
                         some_string => {
-                            for byte in some_string.bytes().from_emoji_stream() {
+                            for byte in some_string.bytes().demojfuscate_stream() {
                                 stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
                             }
                         }
@@ -123,12 +123,12 @@ fn main() {
                 DataType::Text => {
                     match input.as_str() {
                         "-" => {
-                            for byte in unwrapped_std_in.from_emoji_stream() {
+                            for byte in unwrapped_std_in.demojfuscate_stream() {
                                 stream.write(&[byte]).unwrap();
                             }
                         },
                         some_string => {
-                            for byte in some_string.bytes().from_emoji_stream() {
+                            for byte in some_string.bytes().demojfuscate_stream() {
                                 stream.write(&[byte]).unwrap();
                             }
                         }
