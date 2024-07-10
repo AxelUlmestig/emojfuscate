@@ -2,6 +2,7 @@
 pub const BITS_IN_A_BYTE : u32 = 8;
 pub const BITS_PER_EMOJI : u32 = 10;
 pub const MAX_EMOJI_VALUE : u32 = u32::pow(2, BITS_PER_EMOJI);
+pub const STOP_EMOJI_VALUE : u32 = MAX_EMOJI_VALUE + BITS_IN_A_BYTE + 1;
 
 /*
 static EMOJI_HASHMAP : HashMap <char, u32> =

@@ -24,7 +24,9 @@ impl<I : Iterator<Item = u8>> Emojfuscate<I> for I
 
 impl Emojfuscate<std::vec::IntoIter<u8>> for String
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> { self.into_bytes().into_iter().emojfuscate_stream() }
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
+        self.into_bytes().into_iter().emojfuscate_stream().add_stop_emoji()
+    }
 }
 
 impl Emojfuscate<IntoIter<u8, 16>> for Uuid {
@@ -44,7 +46,8 @@ where
     iter: I,
     input_data : usize,
     defined_bits : u32,
-    final_emoji : Option<char>
+    final_emoji : Option<char>,
+    stop_emoji_set : bool
 }
 
 impl<I> EncodeBytesAsEmoji<I>
@@ -52,7 +55,12 @@ where
     I: Iterator<Item = u8>
 {
     pub fn new(iter : I) -> Self {
-        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None }
+        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None, stop_emoji_set: false }
+    }
+
+    pub fn add_stop_emoji(mut self) -> Self {
+        self.stop_emoji_set = true;
+        return self;
     }
 }
 
@@ -97,11 +105,21 @@ where
 
         // If we have a stashed final emoji we delete it and return it
         match self.final_emoji {
-            None => return None,
+            None => (),
             Some(emoji) => {
                 self.final_emoji = None;
                 return Some(emoji);
             }
         }
+
+        // emit a special emoji `add_stop_emoji` is set. It's useful if the value's size is not
+        // known in compile time
+        if self.stop_emoji_set {
+            self.stop_emoji_set = false;
+            let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
+            return Some(stop_emoji);
+        }
+
+        return None;
     }
 }
