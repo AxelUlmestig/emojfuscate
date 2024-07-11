@@ -110,6 +110,25 @@ where
     }
 }
 
+impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+    B: ConstructFromEmoji<B, I>,
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((A, B), DecodeEmojiToBytes<I>), FromEmojiError> {
+        // surely there's a less messy way to do this?
+        match A::construct_from_emoji(byte_stream) {
+            Err(err) => Err(err),
+            Ok((first, remaining_byte_stream)) =>
+                match B::construct_from_emoji(remaining_byte_stream) {
+                    Err(err) => Err(err),
+                    Ok((second, remaining_byte_stream_again)) => Ok(((first, second), remaining_byte_stream_again))
+                }
+        }
+    }
+}
+
 
 pub struct DecodeEmojiToBytes<I>
 where

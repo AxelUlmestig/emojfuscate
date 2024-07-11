@@ -1,6 +1,7 @@
 
 use uuid::Uuid;
 use core::array::IntoIter;
+use core::iter::Chain;
 // use std::vec;
 // use std::str::Bytes;
 
@@ -35,7 +36,20 @@ impl Emojfuscate<IntoIter<u8, 16>> for Uuid {
 
 impl Emojfuscate<std::vec::IntoIter<u8>> for u8 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
-        EncodeBytesAsEmoji::new(vec![self, 1].into_iter())
+        EncodeBytesAsEmoji::new(vec![self].into_iter())
+    }
+}
+
+impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
+where
+    A: Emojfuscate<I1>,
+    B: Emojfuscate<I2>,
+    I1: Iterator<Item = u8>,
+    I2: Iterator<Item = u8>
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
+        let (a, b) = self;
+        a.emojfuscate_stream().chain_emoji_bytes(b.emojfuscate_stream())
     }
 }
 
@@ -61,6 +75,14 @@ where
     pub fn add_stop_emoji(mut self) -> Self {
         self.stop_emoji_set = true;
         return self;
+    }
+
+    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<Chain<I, I2>>
+    where
+        I2: Iterator<Item = u8>
+    {
+        // TODO: set up other stateful stuff
+        EncodeBytesAsEmoji::new(self.iter.chain(other.iter))
     }
 }
 

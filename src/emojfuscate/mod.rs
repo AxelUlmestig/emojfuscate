@@ -21,6 +21,14 @@ mod tests {
         assert_eq!(roundtrip_message, Ok(original_message));
     }
 
+    #[test]
+    fn emojfuscate_tuple() {
+        let original_message = (123, uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
+        let emojified = original_message.clone().emojfuscate();
+        let roundtrip_message = emojified.clone().demojfuscate();
+        assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+    }
+
     proptest! {
         // "\\PC*" generating arbitrary strings composed of arbitrary non-control characters
         #[test]
