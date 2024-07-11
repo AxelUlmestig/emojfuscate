@@ -1,7 +1,6 @@
 
 use uuid::Uuid;
 use core::array::IntoIter;
-use core::iter::Chain;
 // use std::vec;
 // use std::str::Bytes;
 
@@ -40,14 +39,14 @@ impl Emojfuscate<std::vec::IntoIter<u8>> for u8 {
     }
 }
 
-impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
+impl<A, B, I1, I2> Emojfuscate<EmojiByteChain<I1, I2>> for (A, B)
 where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
     I1: Iterator<Item = u8>,
     I2: Iterator<Item = u8>
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<EmojiByteChain<I1, I2>> {
         let (a, b) = self;
         a.emojfuscate_stream().chain_emoji_bytes(b.emojfuscate_stream())
     }
@@ -61,7 +60,9 @@ where
     input_data : usize,
     defined_bits : u32,
     final_emoji : Option<char>,
-    stop_emoji_set : bool
+    // TODO: make an enum that describes the possible stop emoji configurations
+    stop_emoji_set : bool,
+    stop_emoji_armed : bool
 }
 
 impl<I> EncodeBytesAsEmoji<I>
@@ -69,7 +70,7 @@ where
     I: Iterator<Item = u8>
 {
     pub fn new(iter : I) -> Self {
-        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None, stop_emoji_set: false }
+        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None, stop_emoji_set: false, stop_emoji_armed: false }
     }
 
     pub fn add_stop_emoji(mut self) -> Self {
@@ -77,12 +78,15 @@ where
         return self;
     }
 
-    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<Chain<I, I2>>
+    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<EmojiByteChain<I, I2>>
     where
         I2: Iterator<Item = u8>
     {
-        // TODO: set up other stateful stuff
-        EncodeBytesAsEmoji::new(self.iter.chain(other.iter))
+        if self.stop_emoji_set {
+            return EncodeBytesAsEmoji::new(EmojiByteChain::new(self, other)).add_stop_emoji();
+        } else {
+            return EncodeBytesAsEmoji::new(EmojiByteChain::new(self, other));
+        }
     }
 }
 
@@ -92,6 +96,26 @@ where
 {
     type Item = char;
     fn next(&mut self) -> Option<char> {
+        // If we have a stashed final emoji we delete it and return it
+        match self.final_emoji {
+            None => (),
+            Some(emoji) => {
+                self.final_emoji = None;
+                self.stop_emoji_armed = self.stop_emoji_set;
+                return Some(emoji);
+            }
+        }
+
+        // if the iterator temporarily emitted None then we don't want to ask it for next() again
+        // until we've emitted all of the end-of-the-message formatting information, that's why we
+        // have to push this all the way up here
+        if self.stop_emoji_armed {
+            self.stop_emoji_armed = false;
+            self.stop_emoji_set = false;
+            let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
+            return Some(stop_emoji);
+        }
+
         loop {
             let mb = self.iter.next();
             let Some(b) = mb else { break };
@@ -122,26 +146,62 @@ where
             self.defined_bits = 0;
             self.final_emoji = Some(constants::usize_to_emoji(self.input_data << padding));
 
+            self.input_data = 0;
+
             return Some(truncate_bits_emoji);
         }
 
-        // If we have a stashed final emoji we delete it and return it
-        match self.final_emoji {
-            None => (),
-            Some(emoji) => {
-                self.final_emoji = None;
-                return Some(emoji);
-            }
-        }
-
-        // emit a special emoji `add_stop_emoji` is set. It's useful if the value's size is not
+        // emit a special emoji if `add_stop_emoji` is set. It's useful if the value's size is not
         // known in compile time
         if self.stop_emoji_set {
+            self.stop_emoji_armed = false;
             self.stop_emoji_set = false;
             let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
             return Some(stop_emoji);
         }
 
         return None;
+    }
+}
+
+pub struct EmojiByteChain<I1, I2>
+where
+    I1: Iterator<Item = u8>,
+    I2: Iterator<Item = u8>
+{
+    iter1: I1,
+    iter2: I2,
+    break_between_streams: bool
+}
+
+
+impl<I1, I2> EmojiByteChain<I1, I2>
+where
+    I1: Iterator<Item = u8>,
+    I2: Iterator<Item = u8>
+{
+    pub fn new(emoji_stream_1 : EncodeBytesAsEmoji<I1>, emoji_stream_2 : EncodeBytesAsEmoji<I2>) -> Self {
+        Self { iter1 : emoji_stream_1.iter, iter2 : emoji_stream_2.iter, break_between_streams : emoji_stream_1.stop_emoji_set }
+    }
+}
+
+impl<I1, I2> Iterator for EmojiByteChain<I1, I2>
+where
+    I1: Iterator<Item = u8>,
+    I2: Iterator<Item = u8>
+{
+    type Item = u8;
+    fn next(&mut self) -> Option<u8> {
+        // TODO: this is probably horribly inefficient, look up stream fusion and copy from the
+        // existing Chain code https://doc.rust-lang.org/src/core/iter/adapters/chain.rs.html
+        match self.iter1.next() {
+            Some(x) => return Some(x),
+            None => if self.break_between_streams {
+                self.break_between_streams = false;
+                return None;
+            } else {
+                return self.iter2.next();
+            }
+        }
     }
 }
