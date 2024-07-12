@@ -117,15 +117,49 @@ where
     B: ConstructFromEmoji<B, I>,
 {
     fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((A, B), DecodeEmojiToBytes<I>), FromEmojiError> {
-        // surely there's a less messy way to do this?
-        match A::construct_from_emoji(byte_stream) {
-            Err(err) => Err(err),
-            Ok((first, remaining_byte_stream)) =>
-                match B::construct_from_emoji(remaining_byte_stream) {
-                    Err(err) => Err(err),
-                    Ok((second, remaining_byte_stream_again)) => Ok(((first, second), remaining_byte_stream_again))
-                }
-        }
+        let (first, byte_stream_after_1) =
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match B::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        return Ok(((first, second), byte_stream_after_2));
+    }
+}
+
+impl<I, A, B, C> ConstructFromEmoji<(A, B, C), I> for (A, B, C)
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+    B: ConstructFromEmoji<B, I>,
+    C: ConstructFromEmoji<C, I>,
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((A, B, C), DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (first, byte_stream_after_1) =
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match B::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (third, byte_stream_after_3) =
+            match C::construct_from_emoji(byte_stream_after_2) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        return Ok(((first, second, third), byte_stream_after_3));
     }
 }
 

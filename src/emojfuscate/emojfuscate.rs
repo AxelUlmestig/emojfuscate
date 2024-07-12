@@ -1,6 +1,7 @@
 
 use uuid::Uuid;
 use core::array::IntoIter;
+use std::collections::VecDeque;
 // use std::vec;
 // use std::str::Bytes;
 
@@ -33,9 +34,9 @@ impl Emojfuscate<IntoIter<u8, 16>> for Uuid {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<u8, 16>> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
 }
 
-impl Emojfuscate<std::vec::IntoIter<u8>> for u8 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
-        EncodeBytesAsEmoji::new(vec![self].into_iter())
+impl Emojfuscate<std::iter::Once<u8>> for u8 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::iter::Once<u8>> {
+        EncodeBytesAsEmoji::new(std::iter::once(self))
     }
 }
 
@@ -48,7 +49,27 @@ where
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<EmojiByteChain<I1, I2>> {
         let (a, b) = self;
-        a.emojfuscate_stream().chain_emoji_bytes(b.emojfuscate_stream())
+        return a
+            .emojfuscate_stream()
+            .chain_emoji_bytes(b.emojfuscate_stream());
+    }
+}
+
+impl<A, B, C, IA, IB, IC> Emojfuscate<EmojiByteChain<EmojiByteChain<IA, IB>, IC>> for (A, B, C)
+where
+    A: Emojfuscate<IA>,
+    B: Emojfuscate<IB>,
+    C: Emojfuscate<IC>,
+    IA: Iterator<Item = u8>,
+    IB: Iterator<Item = u8>,
+    IC: Iterator<Item = u8>
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<EmojiByteChain<EmojiByteChain<IA, IB>, IC>> {
+        let (a, b, c) = self;
+        return a
+            .emojfuscate_stream()
+            .chain_emoji_bytes(b.emojfuscate_stream())
+            .chain_emoji_bytes(c.emojfuscate_stream());
     }
 }
 
@@ -59,7 +80,8 @@ where
     iter: I,
     input_data : usize,
     defined_bits : u32,
-    final_emoji : Option<char>,
+    queued_emoji : VecDeque<char>,
+    // final_emoji : Option<char>,
     // TODO: make an enum that describes the possible stop emoji configurations
     stop_emoji_set : bool,
     stop_emoji_armed : bool
@@ -70,11 +92,12 @@ where
     I: Iterator<Item = u8>
 {
     pub fn new(iter : I) -> Self {
-        Self { iter, input_data: 0, defined_bits: 0, final_emoji: None, stop_emoji_set: false, stop_emoji_armed: false }
+        Self { iter, input_data: 0, defined_bits: 0, /*final_emoji: None,*/ stop_emoji_set: false, stop_emoji_armed: false, queued_emoji: VecDeque::with_capacity(3) }
     }
 
     pub fn add_stop_emoji(mut self) -> Self {
         self.stop_emoji_set = true;
+        self.stop_emoji_armed = true;
         return self;
     }
 
@@ -96,6 +119,12 @@ where
 {
     type Item = char;
     fn next(&mut self) -> Option<char> {
+        match self.queued_emoji.pop_front() {
+            Some(emoji) => return Some(emoji),
+            None => {}
+        }
+
+        /*
         // If we have a stashed final emoji we delete it and return it
         match self.final_emoji {
             None => (),
@@ -115,10 +144,13 @@ where
             let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
             return Some(stop_emoji);
         }
+        */
 
         loop {
             let mb = self.iter.next();
             let Some(b) = mb else { break };
+
+            self.stop_emoji_armed = self.stop_emoji_set;
 
             self.input_data = (self.input_data << constants::BITS_IN_A_BYTE) | usize::from(b);
             self.defined_bits += constants::BITS_IN_A_BYTE;
@@ -144,23 +176,29 @@ where
             let truncate_bits_emoji = constants::usize_to_emoji(usize::try_from(constants::MAX_EMOJI_VALUE + padding).unwrap());
 
             self.defined_bits = 0;
-            self.final_emoji = Some(constants::usize_to_emoji(self.input_data << padding));
+            let final_emoji = constants::usize_to_emoji(self.input_data << padding);
+            // self.final_emoji = Some(final_emoji);
 
             self.input_data = 0;
 
-            return Some(truncate_bits_emoji);
+            self.queued_emoji.push_back(truncate_bits_emoji);
+            self.queued_emoji.push_back(final_emoji);
+
+            // return Some(truncate_bits_emoji);
         }
 
         // emit a special emoji if `add_stop_emoji` is set. It's useful if the value's size is not
         // known in compile time
-        if self.stop_emoji_set {
+        if self.stop_emoji_armed {
             self.stop_emoji_armed = false;
-            self.stop_emoji_set = false;
+            // self.stop_emoji_set = false;
             let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
-            return Some(stop_emoji);
+            self.queued_emoji.push_back(stop_emoji);
+            // return Some(stop_emoji);
         }
 
-        return None;
+        return self.queued_emoji.pop_front()
+        // return None;
     }
 }
 
@@ -171,7 +209,8 @@ where
 {
     iter1: I1,
     iter2: I2,
-    break_between_streams: bool
+    break_between_streams: bool,
+    break_between_streams_armed: bool
 }
 
 
@@ -181,7 +220,7 @@ where
     I2: Iterator<Item = u8>
 {
     pub fn new(emoji_stream_1 : EncodeBytesAsEmoji<I1>, emoji_stream_2 : EncodeBytesAsEmoji<I2>) -> Self {
-        Self { iter1 : emoji_stream_1.iter, iter2 : emoji_stream_2.iter, break_between_streams : emoji_stream_1.stop_emoji_set }
+        Self { iter1 : emoji_stream_1.iter, iter2 : emoji_stream_2.iter, break_between_streams : emoji_stream_1.stop_emoji_set, break_between_streams_armed : emoji_stream_1.stop_emoji_set  }
     }
 }
 
@@ -195,9 +234,12 @@ where
         // TODO: this is probably horribly inefficient, look up stream fusion and copy from the
         // existing Chain code https://doc.rust-lang.org/src/core/iter/adapters/chain.rs.html
         match self.iter1.next() {
-            Some(x) => return Some(x),
-            None => if self.break_between_streams {
-                self.break_between_streams = false;
+            Some(x) => {
+                self.break_between_streams_armed = self.break_between_streams;
+                return Some(x);
+            },
+            None => if self.break_between_streams_armed {
+                self.break_between_streams_armed = false;
                 return None;
             } else {
                 return self.iter2.next();

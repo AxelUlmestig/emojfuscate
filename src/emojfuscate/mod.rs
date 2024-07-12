@@ -29,6 +29,14 @@ mod tests {
         assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
     }
 
+    #[test]
+    fn emojfuscate_string_triple_hardcoded() {
+        let original_message = ("foo".to_string(), "bar".to_string(), "baz".to_string());
+        let emojified = original_message.clone().emojfuscate();
+        let roundtrip_message = emojified.clone().demojfuscate();
+        assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+    }
+
     proptest! {
         // "\\PC*" generating arbitrary strings composed of arbitrary non-control characters
         #[test]
@@ -50,9 +58,16 @@ mod tests {
         fn emojfuscate_string_tuple(string1 in "\\PC*", string2 in "\\PC*") {
             let original_message = (string1, string2);
             let emojified = original_message.clone().emojfuscate();
-            let roundtrip_message = emojified.demojfuscate();
-            assert_eq!(roundtrip_message, Ok(original_message));
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
 
+        #[test]
+        fn emojfuscate_string_triple(string1 in "\\PC*", string2 in "\\PC*", string3 in "\\PC*") {
+            let original_message = (string1, string2, string3);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
     }
 }
