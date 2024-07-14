@@ -2,6 +2,7 @@
 use uuid::Uuid;
 use core::array::IntoIter;
 use std::collections::VecDeque;
+use std::iter::{Map, Once, once, Chain};
 // use std::vec;
 // use std::str::Bytes;
 
@@ -9,7 +10,7 @@ use super::constants;
 
 pub trait Emojfuscate<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = ByteOrBreak>
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I>;
 
@@ -18,36 +19,44 @@ where
     }
 }
 
-impl<I : Iterator<Item = u8>> Emojfuscate<I> for I
-{
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> { EncodeBytesAsEmoji::new(self) }
+fn wrap_byte(b : u8) -> ByteOrBreak {
+    ByteOrBreak::Byte(b)
 }
 
-impl Emojfuscate<std::vec::IntoIter<u8>> for String
+impl<I : Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteOrBreak>> for I
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::vec::IntoIter<u8>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteOrBreak>> {
+        EncodeBytesAsEmoji::new(self.map(wrap_byte))
+    }
+}
+
+impl Emojfuscate<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>> for String
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>> {
         self.into_bytes().into_iter().emojfuscate_stream().add_stop_emoji()
     }
 }
 
-impl Emojfuscate<IntoIter<u8, 16>> for Uuid {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<u8, 16>> { EncodeBytesAsEmoji::new(self.into_bytes().into_iter()) }
-}
-
-impl Emojfuscate<std::iter::Once<u8>> for u8 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<std::iter::Once<u8>> {
-        EncodeBytesAsEmoji::new(std::iter::once(self))
+impl Emojfuscate<IntoIter<ByteOrBreak, 16>> for Uuid {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 16>> {
+        EncodeBytesAsEmoji::new(self.into_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
     }
 }
 
-impl<A, B, I1, I2> Emojfuscate<EmojiByteChain<I1, I2>> for (A, B)
+impl Emojfuscate<Once<ByteOrBreak>> for u8 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteOrBreak>> {
+        EncodeBytesAsEmoji::new(std::iter::once(ByteOrBreak::Byte(self)))
+    }
+}
+
+impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
 where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
-    I1: Iterator<Item = u8>,
-    I2: Iterator<Item = u8>
+    I1: Iterator<Item = ByteOrBreak>,
+    I2: Iterator<Item = ByteOrBreak>
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<EmojiByteChain<I1, I2>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
         let (a, b) = self;
         return a
             .emojfuscate_stream()
@@ -55,16 +64,16 @@ where
     }
 }
 
-impl<A, B, C, IA, IB, IC> Emojfuscate<EmojiByteChain<EmojiByteChain<IA, IB>, IC>> for (A, B, C)
+impl<A, B, C, IA, IB, IC> Emojfuscate<Chain<Chain<IA, IB>, IC>> for (A, B, C)
 where
     A: Emojfuscate<IA>,
     B: Emojfuscate<IB>,
     C: Emojfuscate<IC>,
-    IA: Iterator<Item = u8>,
-    IB: Iterator<Item = u8>,
-    IC: Iterator<Item = u8>
+    IA: Iterator<Item = ByteOrBreak>,
+    IB: Iterator<Item = ByteOrBreak>,
+    IC: Iterator<Item = ByteOrBreak>
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<EmojiByteChain<EmojiByteChain<IA, IB>, IC>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<IA, IB>, IC>> {
         let (a, b, c) = self;
         return a
             .emojfuscate_stream()
@@ -75,47 +84,47 @@ where
 
 pub struct EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = ByteOrBreak>
 {
     iter: I,
     input_data : usize,
     defined_bits : u32,
-    queued_emoji : VecDeque<char>,
-    // final_emoji : Option<char>,
-    // TODO: make an enum that describes the possible stop emoji configurations
-    stop_emoji_set : bool,
-    stop_emoji_armed : bool
+    queued_emoji : VecDeque<char>
 }
 
 impl<I> EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = ByteOrBreak>
 {
     pub fn new(iter : I) -> Self {
-        Self { iter, input_data: 0, defined_bits: 0, /*final_emoji: None,*/ stop_emoji_set: false, stop_emoji_armed: false, queued_emoji: VecDeque::with_capacity(3) }
+        Self { iter, input_data: 0, defined_bits: 0, queued_emoji: VecDeque::with_capacity(3) }
     }
 
-    pub fn add_stop_emoji(mut self) -> Self {
-        self.stop_emoji_set = true;
-        self.stop_emoji_armed = true;
-        return self;
+    pub fn add_stop_emoji(self) -> EncodeBytesAsEmoji<Chain<I, Once<ByteOrBreak>>> {
+        EncodeBytesAsEmoji {
+            iter: self.iter.chain(once(ByteOrBreak::TemporaryBreak)),
+            input_data: self.input_data,
+            defined_bits: self.defined_bits,
+            queued_emoji: self.queued_emoji
+        }
     }
 
-    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<EmojiByteChain<I, I2>>
+    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<Chain<I, I2>>
     where
-        I2: Iterator<Item = u8>
+        I2: Iterator<Item = ByteOrBreak>
     {
-        if self.stop_emoji_set {
-            return EncodeBytesAsEmoji::new(EmojiByteChain::new(self, other)).add_stop_emoji();
-        } else {
-            return EncodeBytesAsEmoji::new(EmojiByteChain::new(self, other));
+        EncodeBytesAsEmoji {
+            iter: self.iter.chain(other.iter),
+            input_data: self.input_data,
+            defined_bits: self.defined_bits,
+            queued_emoji: self.queued_emoji
         }
     }
 }
 
 impl<I> Iterator for EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = ByteOrBreak>
 {
     type Item = char;
     fn next(&mut self) -> Option<char> {
@@ -124,33 +133,17 @@ where
             None => {}
         }
 
-        /*
-        // If we have a stashed final emoji we delete it and return it
-        match self.final_emoji {
-            None => (),
-            Some(emoji) => {
-                self.final_emoji = None;
-                self.stop_emoji_armed = self.stop_emoji_set;
-                return Some(emoji);
-            }
-        }
-
-        // if the iterator temporarily emitted None then we don't want to ask it for next() again
-        // until we've emitted all of the end-of-the-message formatting information, that's why we
-        // have to push this all the way up here
-        if self.stop_emoji_armed {
-            self.stop_emoji_armed = false;
-            self.stop_emoji_set = false;
-            let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
-            return Some(stop_emoji);
-        }
-        */
-
         loop {
             let mb = self.iter.next();
-            let Some(b) = mb else { break };
-
-            self.stop_emoji_armed = self.stop_emoji_set;
+            let b = match mb {
+                Some(ByteOrBreak::Byte(b)) => b,
+                None => break,
+                Some(ByteOrBreak::TemporaryBreak) => {
+                    let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
+                    self.queued_emoji.push_back(stop_emoji);
+                    break
+                }
+            };
 
             self.input_data = (self.input_data << constants::BITS_IN_A_BYTE) | usize::from(b);
             self.defined_bits += constants::BITS_IN_A_BYTE;
@@ -177,73 +170,20 @@ where
 
             self.defined_bits = 0;
             let final_emoji = constants::usize_to_emoji(self.input_data << padding);
-            // self.final_emoji = Some(final_emoji);
 
             self.input_data = 0;
 
-            self.queued_emoji.push_back(truncate_bits_emoji);
-            self.queued_emoji.push_back(final_emoji);
-
-            // return Some(truncate_bits_emoji);
-        }
-
-        // emit a special emoji if `add_stop_emoji` is set. It's useful if the value's size is not
-        // known in compile time
-        if self.stop_emoji_armed {
-            self.stop_emoji_armed = false;
-            // self.stop_emoji_set = false;
-            let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
-            self.queued_emoji.push_back(stop_emoji);
-            // return Some(stop_emoji);
+            // push to the front so they get in before the 'stop emoji' if it's set
+            self.queued_emoji.push_front(final_emoji);
+            self.queued_emoji.push_front(truncate_bits_emoji);
         }
 
         return self.queued_emoji.pop_front()
-        // return None;
     }
 }
 
-pub struct EmojiByteChain<I1, I2>
-where
-    I1: Iterator<Item = u8>,
-    I2: Iterator<Item = u8>
-{
-    iter1: I1,
-    iter2: I2,
-    break_between_streams: bool,
-    break_between_streams_armed: bool
+pub enum ByteOrBreak {
+    Byte(u8),
+    TemporaryBreak
 }
 
-
-impl<I1, I2> EmojiByteChain<I1, I2>
-where
-    I1: Iterator<Item = u8>,
-    I2: Iterator<Item = u8>
-{
-    pub fn new(emoji_stream_1 : EncodeBytesAsEmoji<I1>, emoji_stream_2 : EncodeBytesAsEmoji<I2>) -> Self {
-        Self { iter1 : emoji_stream_1.iter, iter2 : emoji_stream_2.iter, break_between_streams : emoji_stream_1.stop_emoji_set, break_between_streams_armed : emoji_stream_1.stop_emoji_set  }
-    }
-}
-
-impl<I1, I2> Iterator for EmojiByteChain<I1, I2>
-where
-    I1: Iterator<Item = u8>,
-    I2: Iterator<Item = u8>
-{
-    type Item = u8;
-    fn next(&mut self) -> Option<u8> {
-        // TODO: this is probably horribly inefficient, look up stream fusion and copy from the
-        // existing Chain code https://doc.rust-lang.org/src/core/iter/adapters/chain.rs.html
-        match self.iter1.next() {
-            Some(x) => {
-                self.break_between_streams_armed = self.break_between_streams;
-                return Some(x);
-            },
-            None => if self.break_between_streams_armed {
-                self.break_between_streams_armed = false;
-                return None;
-            } else {
-                return self.iter2.next();
-            }
-        }
-    }
-}
