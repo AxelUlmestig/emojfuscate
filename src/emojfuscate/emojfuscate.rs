@@ -2,9 +2,8 @@
 use uuid::Uuid;
 use core::array::IntoIter;
 use std::collections::VecDeque;
-use std::iter::{Map, Once, once, Chain};
-// use std::vec;
-// use std::str::Bytes;
+use std::vec::Vec;
+use std::iter::{Map, FlatMap, Once, once, Chain};
 
 use super::constants;
 
@@ -19,8 +18,12 @@ where
     }
 }
 
-fn wrap_byte(b : u8) -> ByteOrBreak {
-    ByteOrBreak::Byte(b)
+// implementations
+impl<I : Iterator<Item = ByteOrBreak>> Emojfuscate<I> for I
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+        EncodeBytesAsEmoji::new(self)
+    }
 }
 
 impl<I : Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteOrBreak>> for I
@@ -46,6 +49,62 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 16>> for Uuid {
 impl Emojfuscate<Once<ByteOrBreak>> for u8 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteOrBreak>> {
         EncodeBytesAsEmoji::new(std::iter::once(ByteOrBreak::Byte(self)))
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteOrBreak, 2>> for u16 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 2>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
+    }
+}
+
+/*
+impl<A, IA> Emojfuscate<IA> for [A; 3]
+where
+    A: Emojfuscate<IA>,
+    IA: Iterator<Item = ByteOrBreak>
+{
+    fn emojfuscate_stream(&self) -> EncodeBytesAsEmoji<IA>
+    /*where Self: Sized*/ {
+        self
+            .into_iter()
+            .flat_map(get_emojfuscate_iter)
+            .emojfuscate_stream()
+    }
+}
+*/
+
+fn get_emojfuscate_iter<A, I>(a : A) -> I
+where
+    A: Emojfuscate<I>,
+    I: Iterator<Item = ByteOrBreak>
+{
+    a.emojfuscate_stream().iter
+}
+
+
+impl<A, IA> Emojfuscate<Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>> for Vec<A>
+where
+    A: Emojfuscate<IA>,
+    IA: Iterator<Item = ByteOrBreak>
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>> {
+        let element_count =
+            match u16::try_from(self.len()) {
+                Ok(count) => count,
+                // TODO: is there a more graceful way to handle this?
+                Err(err) => panic!("can't emojfuscate lists that are longer than 2^16 elements, {}", err)
+            };
+
+        let content_data =
+            self
+                .into_iter()
+                .flat_map(get_emojfuscate_iter as fn(A) -> IA)
+                .emojfuscate_stream();
+
+        return element_count
+            .emojfuscate_stream()
+            .chain_emoji_bytes(content_data);
     }
 }
 
@@ -185,5 +244,9 @@ where
 pub enum ByteOrBreak {
     Byte(u8),
     TemporaryBreak
+}
+
+fn wrap_byte(b : u8) -> ByteOrBreak {
+    ByteOrBreak::Byte(b)
 }
 

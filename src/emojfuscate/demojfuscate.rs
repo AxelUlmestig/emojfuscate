@@ -110,6 +110,56 @@ where
     }
 }
 
+impl<I> ConstructFromEmoji<u16, I> for u16
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(u16, DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (first, byte_stream_after_1) =
+            match u8::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match u8::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let u16 = ((first as u16) << 8) | second as u16;
+        return Ok((u16, byte_stream_after_2));
+    }
+}
+
+impl<I, A> ConstructFromEmoji<Vec<A>, I> for Vec<A>
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(Vec<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (element_count, mut byte_stream_after_1) =
+            match u16::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let mut vec = Vec::with_capacity(usize::from(element_count));
+
+        for element_index in 0..usize::from(element_count) {
+            match A::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok((x, new_byte_stream)) => {
+                    byte_stream_after_1 = new_byte_stream;
+                    vec.insert(element_index, x);
+                }
+            };
+        }
+
+        return Ok((vec, byte_stream_after_1));
+    }
+}
+
 impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
 where
     I: Iterator<Item = u8>,
