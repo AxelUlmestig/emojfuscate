@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::str;
 use uuid::Uuid;
-use uuid::Builder;
 use arrayvec::ArrayVec;
 
 #[path = "constants.rs"]
