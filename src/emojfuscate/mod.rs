@@ -83,5 +83,13 @@ mod tests {
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
+
+        #[test]
+        fn emojfuscate_u8_array(b1 : u8, b2 : u8, b3 : u8, b4 : u8, b5 : u8) {
+            let original_message = [b1, b2, b3, b4, b5];
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message : Result<[u8; 5], _> = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
     }
 }

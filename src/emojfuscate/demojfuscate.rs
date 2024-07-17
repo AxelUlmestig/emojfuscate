@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::str;
 use uuid::Uuid;
 use uuid::Builder;
+use arrayvec::ArrayVec;
 
 #[path = "constants.rs"]
 mod constants;
@@ -129,6 +130,32 @@ where
 
         let u16 = ((first as u16) << 8) | second as u16;
         return Ok((u16, byte_stream_after_2));
+    }
+}
+
+
+impl<I, A, const S : usize> ConstructFromEmoji<[A; S], I> for [A; S]
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>
+{
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<([A; S], DecodeEmojiToBytes<I>), FromEmojiError> {
+        let mut array_vec = ArrayVec::<A, S>::new();
+
+        for element_index in 0..array_vec.capacity() {
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok((x, new_byte_stream)) => {
+                    byte_stream = new_byte_stream;
+                    array_vec.insert(element_index, x);
+                }
+            };
+        }
+
+        return match array_vec.into_inner() {
+            Ok(array) => Ok((array, byte_stream)),
+            Err(_) => Err(FromEmojiError::NotEnoughEmoji) // this should be impossible
+        };
     }
 }
 

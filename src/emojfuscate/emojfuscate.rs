@@ -58,21 +58,19 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 2>> for u16 {
     }
 }
 
-/*
-impl<A, IA> Emojfuscate<IA> for [A; 3]
+impl<A, IA, const S : usize> Emojfuscate<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>> for [A; S]
 where
     A: Emojfuscate<IA>,
     IA: Iterator<Item = ByteOrBreak>
 {
-    fn emojfuscate_stream(&self) -> EncodeBytesAsEmoji<IA>
-    /*where Self: Sized*/ {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>>
+    {
         self
             .into_iter()
-            .flat_map(get_emojfuscate_iter)
+            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
             .emojfuscate_stream()
     }
 }
-*/
 
 fn get_emojfuscate_iter<A, I>(a : A) -> I
 where
