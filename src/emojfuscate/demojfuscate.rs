@@ -206,6 +206,22 @@ where
     }
 }
 
+impl<I> ConstructFromEmoji<char, I> for char
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(char, DecodeEmojiToBytes<I>), FromEmojiError> {
+        match <[u8; 4]>::construct_from_emoji(byte_stream) {
+            Err(err) => Err(err),
+            Ok((bytes, new_byte_stream)) =>
+                match char::from_u32(u32::from_be_bytes(bytes)) {
+                    Some(char) => Ok((char, new_byte_stream)),
+                    None => Err(FromEmojiError::UnexpectedInput(format!("Can't create char from u32: {}", u32::from_be_bytes(bytes))))
+                }
+        }
+    }
+}
+
 impl<I> ConstructFromEmoji<u8, I> for u8
 where
     I: Iterator<Item = u8>

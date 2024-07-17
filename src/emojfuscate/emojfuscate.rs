@@ -156,6 +156,13 @@ impl Emojfuscate<Once<ByteOrBreak>> for bool
     }
 }
 
+impl Emojfuscate<IntoIter<ByteOrBreak, 4>> for char
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 4>> {
+        (self as u32).emojfuscate_stream()
+    }
+}
+
 impl Emojfuscate<Once<ByteOrBreak>> for u8 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteOrBreak>> {
         EncodeBytesAsEmoji::new(std::iter::once(ByteOrBreak::Byte(self)))
