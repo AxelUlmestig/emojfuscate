@@ -87,6 +87,13 @@ mod tests {
         }
 
         #[test]
+        fn emojfuscate_u128(original_message : u128) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
         fn emojfuscate_i8(original_message : i8) {
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
@@ -109,6 +116,13 @@ mod tests {
 
         #[test]
         fn emojfuscate_i64(original_message : i64) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_i128(original_message : i128) {
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);

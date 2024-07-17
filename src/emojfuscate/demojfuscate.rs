@@ -268,6 +268,18 @@ where
     }
 }
 
+impl<I> ConstructFromEmoji<u128, I> for u128
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) ->
+        Result<(u128, DecodeEmojiToBytes<I>), FromEmojiError>
+    {
+        <[u8; 16]>::construct_from_emoji(byte_stream)
+            .map(|(bytes, new_byte_stream)| (u128::from_be_bytes(bytes), new_byte_stream))
+    }
+}
+
 impl<I> ConstructFromEmoji<i8, I> for i8
 where
     I: Iterator<Item = u8>
@@ -313,6 +325,18 @@ where
     {
         <[u8; 8]>::construct_from_emoji(byte_stream)
             .map(|(bytes, new_byte_stream)| (i64::from_be_bytes(bytes), new_byte_stream))
+    }
+}
+
+impl<I> ConstructFromEmoji<i128, I> for i128
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) ->
+        Result<(i128, DecodeEmojiToBytes<I>), FromEmojiError>
+    {
+        <[u8; 16]>::construct_from_emoji(byte_stream)
+            .map(|(bytes, new_byte_stream)| (i128::from_be_bytes(bytes), new_byte_stream))
     }
 }
 

@@ -187,6 +187,12 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 8>> for u64 {
     }
 }
 
+impl Emojfuscate<IntoIter<ByteOrBreak, 16>> for u128 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 16>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
+    }
+}
+
 impl Emojfuscate<IntoIter<ByteOrBreak, 1>> for i8 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 1>> {
         EncodeBytesAsEmoji::new(self.to_be_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
@@ -207,6 +213,12 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 4>> for i32 {
 
 impl Emojfuscate<IntoIter<ByteOrBreak, 8>> for i64 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 8>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteOrBreak, 16>> for i128 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 16>> {
         EncodeBytesAsEmoji::new(self.to_be_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
     }
 }
