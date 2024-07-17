@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::str;
 use uuid::Uuid;
-use uuid::Builder;
+use arrayvec::ArrayVec;
 
 #[path = "constants.rs"]
 mod constants;
@@ -27,7 +27,8 @@ pub trait ConstructFromEmoji<A, I>
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError> where Self : Sized;
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) ->
+        Result<(A, DecodeEmojiToBytes<I>), FromEmojiError> where Self : Sized;
 }
 
 #[derive(Debug)]
@@ -44,7 +45,10 @@ where
     I: Iterator<Item = u8>
 {
     fn demojfuscate(self) -> Result<B, FromEmojiError> where Self : Sized {
-        B::construct_from_emoji(self.demojfuscate_stream())
+        match B::construct_from_emoji(self.demojfuscate_stream()) {
+            Ok((value, _)) => Ok(value),
+            Err(err) => Err(err)
+        }
     }
 }
 
@@ -62,24 +66,24 @@ impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String
     }
 }
 
+/*
 impl<I> ConstructFromEmoji<DecodeEmojiToBytes<I>, I> for DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<DecodeEmojiToBytes<I>, FromEmojiError> {
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(DecodeEmojiToBytes<I>, DecodeEmojiToBytes<I>), FromEmojiError> {
         Ok(byte_stream)
     }
 }
+*/
 
 impl<I> ConstructFromEmoji<Uuid, I> for Uuid
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<Uuid, FromEmojiError> {
-        match Builder::from_slice(byte_stream.collect::<Vec<u8>>().as_slice()) {
-            Ok(builder) => Ok(builder.into_uuid()),
-            Err(_err) => Err(FromEmojiError::NotEnoughEmoji)
-        }
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(Uuid, DecodeEmojiToBytes<I>), FromEmojiError> {
+        <[u8; 16]>::construct_from_emoji(byte_stream)
+            .map(|(bytes, new_byte_stream)| (Uuid::from_bytes(bytes), new_byte_stream))
     }
 }
 
@@ -87,8 +91,8 @@ impl<I> ConstructFromEmoji<String, I> for String
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<String, FromEmojiError> {
-        Ok(String::from_utf8(byte_stream.collect::<Vec<u8>>()).unwrap())
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<(String, DecodeEmojiToBytes<I>), FromEmojiError> {
+        Ok((String::from_utf8(byte_stream.by_ref().collect::<Vec<u8>>()).unwrap(), byte_stream))
     }
 }
 
@@ -96,8 +100,140 @@ impl<I> ConstructFromEmoji<u8, I> for u8
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<u8, FromEmojiError> {
-        Ok(byte_stream.next().unwrap())
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<(u8, DecodeEmojiToBytes<I>), FromEmojiError> {
+        match byte_stream.next() {
+            Some(byte) => Ok((byte, byte_stream)),
+            None => Err(FromEmojiError::NotEnoughEmoji)
+        }
+    }
+}
+
+impl<I> ConstructFromEmoji<u16, I> for u16
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(u16, DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (first, byte_stream_after_1) =
+            match u8::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match u8::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let u16 = ((first as u16) << 8) | second as u16;
+        return Ok((u16, byte_stream_after_2));
+    }
+}
+
+
+impl<I, A, const S : usize> ConstructFromEmoji<[A; S], I> for [A; S]
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>
+{
+    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<([A; S], DecodeEmojiToBytes<I>), FromEmojiError> {
+        let mut array_vec = ArrayVec::<A, S>::new();
+
+        for element_index in 0..array_vec.capacity() {
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok((x, new_byte_stream)) => {
+                    byte_stream = new_byte_stream;
+                    array_vec.insert(element_index, x);
+                }
+            };
+        }
+
+        return match array_vec.into_inner() {
+            Ok(array) => Ok((array, byte_stream)),
+            Err(_) => Err(FromEmojiError::NotEnoughEmoji) // this should be impossible
+        };
+    }
+}
+
+impl<I, A> ConstructFromEmoji<Vec<A>, I> for Vec<A>
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(Vec<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (element_count, mut byte_stream_after_1) =
+            match u16::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let mut vec = Vec::with_capacity(usize::from(element_count));
+
+        for element_index in 0..usize::from(element_count) {
+            match A::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok((x, new_byte_stream)) => {
+                    byte_stream_after_1 = new_byte_stream;
+                    vec.insert(element_index, x);
+                }
+            };
+        }
+
+        return Ok((vec, byte_stream_after_1));
+    }
+}
+
+impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+    B: ConstructFromEmoji<B, I>,
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((A, B), DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (first, byte_stream_after_1) =
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match B::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        return Ok(((first, second), byte_stream_after_2));
+    }
+}
+
+impl<I, A, B, C> ConstructFromEmoji<(A, B, C), I> for (A, B, C)
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+    B: ConstructFromEmoji<B, I>,
+    C: ConstructFromEmoji<C, I>,
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((A, B, C), DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (first, byte_stream_after_1) =
+            match A::construct_from_emoji(byte_stream) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (second, byte_stream_after_2) =
+            match B::construct_from_emoji(byte_stream_after_1) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        let (third, byte_stream_after_3) =
+            match C::construct_from_emoji(byte_stream_after_2) {
+                Err(err) => return Err(err),
+                Ok(result) => result
+            };
+
+        return Ok(((first, second, third), byte_stream_after_3));
     }
 }
 
@@ -181,6 +317,12 @@ where
                     Some(x) => x,
                     None => panic!("Unexpected input character: {}", emoji)
                 };
+
+            // the stop emoji is used by types whose type is unknown at compile time (e.g. strings)
+            // to indicate that they're done
+            if *emoji_value == constants::STOP_EMOJI_VALUE {
+                return None
+            }
 
             // emoji beyond 2047 are used to indicate that the next emoji produces too many bits. This
             // happens at the end of the encoded message
