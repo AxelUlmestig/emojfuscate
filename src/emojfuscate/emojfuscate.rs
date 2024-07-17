@@ -40,9 +40,11 @@ impl Emojfuscate<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<
     }
 }
 
-impl Emojfuscate<IntoIter<ByteOrBreak, 16>> for Uuid {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 16>> {
-        EncodeBytesAsEmoji::new(self.into_bytes().map(|b| ByteOrBreak::Byte(b)).into_iter())
+impl Emojfuscate<FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>> for Uuid {
+    fn emojfuscate_stream(self) ->
+        EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>>
+    {
+        return self.into_bytes().emojfuscate_stream();
     }
 }
 

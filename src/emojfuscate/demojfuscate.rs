@@ -82,11 +82,9 @@ impl<I> ConstructFromEmoji<Uuid, I> for Uuid
 where
     I: Iterator<Item = u8>
 {
-    fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes<I>) -> Result<(Uuid, DecodeEmojiToBytes<I>), FromEmojiError> {
-        match Builder::from_slice(byte_stream.by_ref().take(16).collect::<Vec<u8>>().as_slice()) {
-            Ok(builder) => Ok((builder.into_uuid(), byte_stream)),
-            Err(_err) => Err(FromEmojiError::NotEnoughEmoji)
-        }
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(Uuid, DecodeEmojiToBytes<I>), FromEmojiError> {
+        <[u8; 16]>::construct_from_emoji(byte_stream)
+            .map(|(bytes, new_byte_stream)| (Uuid::from_bytes(bytes), new_byte_stream))
     }
 }
 
