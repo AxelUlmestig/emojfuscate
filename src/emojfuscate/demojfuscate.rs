@@ -319,8 +319,8 @@ where
                     None => panic!("Unexpected input character: {}", emoji)
                 };
 
-            // the stop emoji is used by types whose type is unknown at compile time (e.g. strings
-            // or arrays) to indicate that they're done
+            // the stop emoji is used by types whose type is unknown at compile time (e.g. strings)
+            // to indicate that they're done
             if *emoji_value == constants::STOP_EMOJI_VALUE {
                 return None
             }
