@@ -30,6 +30,13 @@ mod tests {
     }
 
     proptest! {
+        #[test]
+        fn emojfuscate_bool(original_message : bool) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
         // "\\PC*" generating arbitrary strings composed of arbitrary non-control characters
         #[test]
         fn emojfuscate_string(original_message in "\\PC*") {

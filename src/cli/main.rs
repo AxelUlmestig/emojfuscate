@@ -6,7 +6,7 @@ use std::str;
 use std::io::BufWriter;
 use uuid::Uuid;
 use hex;
-// use std::process::ExitCode;
+use std::process::ExitCode;
 
 use emojfuscate::emojfuscate::Emojfuscate;
 use emojfuscate::demojfuscate::{ConstructFromEmojiStream, Demojfuscate, FromEmojiError};
@@ -37,7 +37,7 @@ enum DataType {
     Hexadecimal
 }
 
-fn main() {
+fn main() -> ExitCode {
     let cli = Cli::parse();
 
     let unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
@@ -101,8 +101,11 @@ fn main() {
                         },
                         Err(FromEmojiError::NotEnoughEmoji) => {
                             eprintln!("Not enough emoji in input to construct a UUID");
-                            std::process::exit(1);
-                            // return ExitCode::FAILURE;
+                            return ExitCode::FAILURE;
+                        },
+                        Err(FromEmojiError::UnexpectedInput(error_message)) => {
+                            eprintln!("{}", error_message);
+                            return ExitCode::FAILURE;
                         }
                     }
                 },
@@ -144,6 +147,6 @@ fn main() {
 
     io::stdout().flush().unwrap();
 
-    // return ExitCode::SUCCESS;
+    return ExitCode::SUCCESS;
 }
 
