@@ -3,7 +3,7 @@ use uuid::Uuid;
 use core::array::IntoIter;
 use std::collections::VecDeque;
 use std::vec::Vec;
-use std::iter::{Map, FlatMap, Once, once, Chain};
+use std::iter::{Map, FlatMap, Once, once, Chain, Empty, empty};
 
 use super::constants;
 
@@ -139,6 +139,13 @@ impl<I : Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteOrBreak>> for I
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteOrBreak>> {
         EncodeBytesAsEmoji::new(self.map(wrap_byte))
+    }
+}
+
+impl Emojfuscate<Empty<ByteOrBreak>> for ()
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Empty<ByteOrBreak>> {
+        EncodeBytesAsEmoji::new(empty::<ByteOrBreak>())
     }
 }
 

@@ -183,6 +183,15 @@ where
 */
 
 // implementations
+impl<I> ConstructFromEmoji<(), I> for ()
+where
+    I: Iterator<Item = u8>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<((), DecodeEmojiToBytes<I>), FromEmojiError> {
+        Ok(((), byte_stream))
+    }
+}
+
 impl<I> ConstructFromEmoji<bool, I> for bool
 where
     I: Iterator<Item = u8>
