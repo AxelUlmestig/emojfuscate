@@ -61,6 +61,62 @@ mod tests {
         }
 
         #[test]
+        fn emojfuscate_u32(original_message : u32) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_u64(original_message : u64) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_i8(original_message : i8) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_i16(original_message : i16) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_i32(original_message : i32) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_i64(original_message : i64) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_f32(original_message : f32) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_f64(original_message : f64) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
         fn emojfuscate_string_tuple(string1 in "\\PC*", string2 in "\\PC*") {
             let original_message = (string1, string2);
             let emojified = original_message.clone().emojfuscate();
