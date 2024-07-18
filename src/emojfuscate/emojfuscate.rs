@@ -3,7 +3,7 @@ use uuid::Uuid;
 use core::array::IntoIter;
 use std::collections::VecDeque;
 use std::vec::Vec;
-use std::iter::{Map, FlatMap, Once, once, Chain, Empty, empty};
+use std::iter::{Map, FlatMap, Once, once, Chain, Empty, empty, Flatten};
 
 use super::constants;
 
@@ -295,6 +295,29 @@ where
         return element_count
             .emojfuscate_stream()
             .chain_emoji_bytes(content_data);
+    }
+}
+
+impl<A, IA> Emojfuscate<Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>> for Option<A>
+where
+    A: Emojfuscate<IA>,
+    IA: Iterator<Item = ByteOrBreak>
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>> {
+        let constructor_discriminator
+            = match self {
+                None => 0u8,
+                Some(_) => 1
+            };
+
+        let iter = self
+            .map(get_emojfuscate_iter as fn(A) -> IA)
+            .into_iter()
+            .flatten();
+
+        return constructor_discriminator
+            .emojfuscate_stream()
+            .chain_emoji_bytes(EncodeBytesAsEmoji::new(iter));
     }
 }
 

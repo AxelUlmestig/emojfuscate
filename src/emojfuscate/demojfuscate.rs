@@ -436,6 +436,21 @@ where
     }
 }
 
+impl<I, A> ConstructFromEmoji<Option<A>, I> for Option<A>
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>
+{
+    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(Option<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        match u8::construct_from_emoji(byte_stream) {
+            Err(err) => Err(err),
+            Ok((0, new_byte_stream)) => Ok((None, new_byte_stream)),
+            Ok((1, new_byte_stream)) => A::construct_from_emoji(new_byte_stream).map(|(x, bs)| (Some(x), bs)),
+            Ok((n, _)) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing option, expected first byte to be 0 for None or 1 for Some, instead got: {}", n)))
+        }
+    }
+}
+
 impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
 where
     I: Iterator<Item = u8>,

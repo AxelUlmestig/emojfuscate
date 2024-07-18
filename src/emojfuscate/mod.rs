@@ -180,5 +180,14 @@ mod tests {
             let roundtrip_message : Result<[u8; 5], _> = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
+
+
+        #[test]
+        fn emojfuscate_option_u8_array(b1 : Option<u8>, b2 : Option<u8>, b3 : Option<u8>) {
+            let original_message = [b1, b2, b3];
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message : Result<[Option<u8>; 3], _> = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
     }
 }
