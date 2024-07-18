@@ -321,6 +321,30 @@ where
     }
 }
 
+impl<A, B, IA, IB> Emojfuscate<Chain<Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>>> for Result<A, B>
+where
+    A: Emojfuscate<IA>,
+    B: Emojfuscate<IB>,
+    IA: Iterator<Item = ByteOrBreak>,
+    IB: Iterator<Item = ByteOrBreak>
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>>>
+    {
+        match self {
+            Ok(x) =>
+                0u8
+                    .emojfuscate_stream()
+                    .chain_emoji_bytes(Some(x).emojfuscate_stream())
+                    .chain_emoji_bytes(None::<B>.emojfuscate_stream()),
+            Err(x) =>
+                1u8
+                    .emojfuscate_stream()
+                    .chain_emoji_bytes(None::<A>.emojfuscate_stream())
+                    .chain_emoji_bytes(Some(x).emojfuscate_stream())
+        }
+    }
+}
+
 impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
 where
     A: Emojfuscate<I1>,

@@ -446,7 +446,49 @@ where
             Err(err) => Err(err),
             Ok((0, new_byte_stream)) => Ok((None, new_byte_stream)),
             Ok((1, new_byte_stream)) => A::construct_from_emoji(new_byte_stream).map(|(x, bs)| (Some(x), bs)),
-            Ok((n, _)) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing option, expected first byte to be 0 for None or 1 for Some, instead got: {}", n)))
+            Ok((n, _)) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing Option, expected first byte to be 0 for None or 1 for Some, instead got: {}", n)))
+        }
+    }
+}
+
+impl<I, A, B> ConstructFromEmoji<Result<A, B>, I> for Result<A, B>
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+    B: ConstructFromEmoji<B, I>,
+{
+    fn construct_from_emoji(byte_stream_0 : DecodeEmojiToBytes<I>) -> Result<(Result<A, B>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        let (constructor_discriminator, byte_stream_1) =
+            match u8::construct_from_emoji(byte_stream_0) {
+                Err(err) => return Err(err),
+                Ok((n, byte_stream_1)) => (n, byte_stream_1)
+            };
+
+        let (m_ok_data, byte_stream_2) =
+            match Option::construct_from_emoji(byte_stream_1) {
+                Err(err) => return Err(err),
+                Ok((x, byte_stream_2)) => (x, byte_stream_2)
+            };
+
+        let (m_err_data, byte_stream_3) =
+            match Option::construct_from_emoji(byte_stream_2) {
+                Err(err) => return Err(err),
+                Ok((x, byte_stream_3)) => (x, byte_stream_3)
+            };
+
+        return match (constructor_discriminator, m_ok_data, m_err_data) {
+            // Ok
+            (0, None, None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, no data found when parsing Ok branch".to_string())),
+            (0, None, Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, only Err data found when parsing Ok branch".to_string())),
+            (0, Some(ok_data), None) => Ok((Ok(ok_data), byte_stream_3)),
+            (0, Some(_), Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, both Ok and Err data found when parsing Ok branch".to_string())),
+            // Err
+            (1, None, None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, no data found when parsing Err branch".to_string())),
+            (1, None, Some(err_data)) => Ok((Err(err_data), byte_stream_3)),
+            (1, Some(_), None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, only Ok data found when parsing Err branch".to_string())),
+            (1, Some(_), Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, both Ok and Err data found when parsing Err branch".to_string())),
+            // None of the above
+            (n, _, _) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing Result, expected first byte to be 0 for Ok or 1 for Err, instead got: {}", n)))
         }
     }
 }
