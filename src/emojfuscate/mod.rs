@@ -1,15 +1,14 @@
-pub mod emojfuscate;
-pub mod demojfuscate;
-pub mod hex_stream;
 mod constants;
-
+pub mod demojfuscate;
+pub mod emojfuscate;
+pub mod hex_stream;
 
 #[cfg(test)]
 mod tests {
-    use crate::emojfuscate::Emojfuscate;
     use crate::demojfuscate::Demojfuscate;
-    use uuid::uuid;
+    use crate::emojfuscate::Emojfuscate;
     use proptest::prelude::*;
+    use uuid::uuid;
 
     // there's no Arbitrary instance for Uuid :(
     #[test]
@@ -18,7 +17,12 @@ mod tests {
         // let original_message : Uuid = Uuid::new_v4();
         let emojified = original_message.clone().emojfuscate();
         let roundtrip_message = emojified.clone().demojfuscate();
-        assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        assert_eq!(
+            roundtrip_message,
+            Ok(original_message),
+            "emojfuscated version: {}",
+            emojified
+        );
     }
 
     #[test]
@@ -26,7 +30,12 @@ mod tests {
         let original_message = (123u8, uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
         let emojified = original_message.clone().emojfuscate();
         let roundtrip_message = emojified.clone().demojfuscate();
-        assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        assert_eq!(
+            roundtrip_message,
+            Ok(original_message),
+            "emojfuscated version: {}",
+            emojified
+        );
     }
 
     proptest! {

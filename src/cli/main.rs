@@ -1,15 +1,15 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use hex;
 use std::io;
+use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
-use std::str;
-use std::io::BufWriter;
-use uuid::Uuid;
-use hex;
 use std::process::ExitCode;
+use std::str;
+use uuid::Uuid;
 
-use emojfuscate::emojfuscate::Emojfuscate;
 use emojfuscate::demojfuscate::{ConstructFromEmojiStream, Demojfuscate, FromEmojiError};
+use emojfuscate::emojfuscate::Emojfuscate;
 use emojfuscate::hex_stream::HexStream;
 
 #[derive(Parser)]
@@ -34,7 +34,7 @@ enum Commands {
 enum DataType {
     Text,
     UUID,
-    Hexadecimal
+    Hexadecimal,
 }
 
 fn main() -> ExitCode {
@@ -45,100 +45,97 @@ fn main() -> ExitCode {
     let mut stream = BufWriter::new(io::stdout());
 
     match &cli.command {
-        Commands::Encode { data_type, input } => {
-            match &data_type {
-                DataType::UUID => {
-                    let uuid =
-                        match input.as_str() {
-                            "-" => { Uuid::parse_str(std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap()).unwrap() },
-                            uuid_string => { Uuid::parse_str(uuid_string).unwrap() }
-                        };
+        Commands::Encode { data_type, input } => match &data_type {
+            DataType::UUID => {
+                let uuid = match input.as_str() {
+                    "-" => Uuid::parse_str(
+                        std::str::from_utf8(&unwrapped_std_in.collect::<Vec<u8>>()).unwrap(),
+                    )
+                    .unwrap(),
+                    uuid_string => Uuid::parse_str(uuid_string).unwrap(),
+                };
 
-                    for emoji in uuid.emojfuscate_stream() {
+                for emoji in uuid.emojfuscate_stream() {
+                    stream.write(emoji.to_string().as_bytes()).unwrap();
+                }
+            }
+            DataType::Hexadecimal => match input.as_str() {
+                "-" => {
+                    for emoji in HexStream::new(unwrapped_std_in).emojfuscate_stream() {
                         stream.write(emoji.to_string().as_bytes()).unwrap();
                     }
-                },
-                DataType::Hexadecimal => {
-                    match input.as_str() {
-                        "-" => {
-                            for emoji in HexStream::new(unwrapped_std_in).emojfuscate_stream() {
-                                stream.write(emoji.to_string().as_bytes()).unwrap();
-                            }
-                        },
-                        some_string => {
-                            for emoji in HexStream::new(some_string.bytes()).emojfuscate_stream() {
-                                stream.write(emoji.to_string().as_bytes()).unwrap();
-                            }
-                        }
-                    }
-                },
-                DataType::Text => {
-                    match input.as_str() {
-                        "-" => {
-                            for emoji in unwrapped_std_in.emojfuscate_stream() {
-                                stream.write(emoji.to_string().as_bytes()).unwrap();
-                            }
-                        },
-                        some_string => {
-                            stream.write(some_string.bytes().emojfuscate().as_bytes()).unwrap();
-                        }
+                }
+                some_string => {
+                    for emoji in HexStream::new(some_string.bytes()).emojfuscate_stream() {
+                        stream.write(emoji.to_string().as_bytes()).unwrap();
                     }
                 }
-            }
+            },
+            DataType::Text => match input.as_str() {
+                "-" => {
+                    for emoji in unwrapped_std_in.emojfuscate_stream() {
+                        stream.write(emoji.to_string().as_bytes()).unwrap();
+                    }
+                }
+                some_string => {
+                    stream
+                        .write(some_string.bytes().emojfuscate().as_bytes())
+                        .unwrap();
+                }
+            },
         },
-        Commands::Decode { data_type, input } => {
-            match &data_type {
-                DataType::UUID => {
-                    let r_uuid : Result<Uuid, FromEmojiError> =
-                        match input.as_str() {
-                            "-" => unwrapped_std_in.demojfuscate(),
-                            some_string => some_string.bytes().demojfuscate()
-                        };
+        Commands::Decode { data_type, input } => match &data_type {
+            DataType::UUID => {
+                let r_uuid: Result<Uuid, FromEmojiError> = match input.as_str() {
+                    "-" => unwrapped_std_in.demojfuscate(),
+                    some_string => some_string.bytes().demojfuscate(),
+                };
 
-                    match r_uuid {
-                        Ok(uuid) => {
-                            stream.write(uuid.hyphenated().encode_lower(&mut Uuid::encode_buffer()).as_bytes()).unwrap();
-                        },
-                        Err(FromEmojiError::NotEnoughEmoji) => {
-                            eprintln!("Not enough emoji in input to construct a UUID");
-                            return ExitCode::FAILURE;
-                        },
-                        Err(FromEmojiError::UnexpectedInput(error_message)) => {
-                            eprintln!("{}", error_message);
-                            return ExitCode::FAILURE;
-                        }
+                match r_uuid {
+                    Ok(uuid) => {
+                        stream
+                            .write(
+                                uuid.hyphenated()
+                                    .encode_lower(&mut Uuid::encode_buffer())
+                                    .as_bytes(),
+                            )
+                            .unwrap();
                     }
-                },
-                DataType::Hexadecimal => {
-                    match input.as_str() {
-                        "-" => {
-                            for byte in unwrapped_std_in.demojfuscate_stream() {
-                                stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
-                            }
-                        },
-                        some_string => {
-                            for byte in some_string.bytes().demojfuscate_stream() {
-                                stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
-                            }
-                        }
+                    Err(FromEmojiError::NotEnoughEmoji) => {
+                        eprintln!("Not enough emoji in input to construct a UUID");
+                        return ExitCode::FAILURE;
                     }
-                }
-                DataType::Text => {
-                    match input.as_str() {
-                        "-" => {
-                            for byte in unwrapped_std_in.demojfuscate_stream() {
-                                stream.write(&[byte]).unwrap();
-                            }
-                        },
-                        some_string => {
-                            for byte in some_string.bytes().demojfuscate_stream() {
-                                stream.write(&[byte]).unwrap();
-                            }
-                        }
+                    Err(FromEmojiError::UnexpectedInput(error_message)) => {
+                        eprintln!("{}", error_message);
+                        return ExitCode::FAILURE;
                     }
                 }
             }
-        }
+            DataType::Hexadecimal => match input.as_str() {
+                "-" => {
+                    for byte in unwrapped_std_in.demojfuscate_stream() {
+                        stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
+                    }
+                }
+                some_string => {
+                    for byte in some_string.bytes().demojfuscate_stream() {
+                        stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
+                    }
+                }
+            },
+            DataType::Text => match input.as_str() {
+                "-" => {
+                    for byte in unwrapped_std_in.demojfuscate_stream() {
+                        stream.write(&[byte]).unwrap();
+                    }
+                }
+                some_string => {
+                    for byte in some_string.bytes().demojfuscate_stream() {
+                        stream.write(&[byte]).unwrap();
+                    }
+                }
+            },
+        },
     };
 
     if cli.line_break {
@@ -149,4 +146,3 @@ fn main() -> ExitCode {
 
     return ExitCode::SUCCESS;
 }
-

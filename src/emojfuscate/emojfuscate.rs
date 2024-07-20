@@ -1,39 +1,46 @@
-
-use uuid::Uuid;
 use core::array::IntoIter;
 use std::collections::VecDeque;
+use std::iter::{empty, once, Chain, Empty, FlatMap, Flatten, Map, Once};
 use std::vec::Vec;
-use std::iter::{Map, FlatMap, Once, once, Chain, Empty, empty, Flatten};
+use uuid::Uuid;
 
 use super::constants;
 
 pub trait Emojfuscate<I>
 where
-    I: Iterator<Item = ByteOrBreak>
+    I: Iterator<Item = ByteOrBreak>,
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I>;
 
-    fn emojfuscate(self) -> String where Self: Sized {
+    fn emojfuscate(self) -> String
+    where
+        Self: Sized,
+    {
         return self.emojfuscate_stream().collect();
     }
 }
 
 pub struct EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = ByteOrBreak>
+    I: Iterator<Item = ByteOrBreak>,
 {
     iter: I,
-    input_data : usize,
-    defined_bits : u32,
-    queued_emoji : VecDeque<char>
+    input_data: usize,
+    defined_bits: u32,
+    queued_emoji: VecDeque<char>,
 }
 
 impl<I> EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = ByteOrBreak>
+    I: Iterator<Item = ByteOrBreak>,
 {
-    pub fn new(iter : I) -> Self {
-        Self { iter, input_data: 0, defined_bits: 0, queued_emoji: VecDeque::with_capacity(3) }
+    pub fn new(iter: I) -> Self {
+        Self {
+            iter,
+            input_data: 0,
+            defined_bits: 0,
+            queued_emoji: VecDeque::with_capacity(3),
+        }
     }
 
     pub fn add_stop_emoji(self) -> EncodeBytesAsEmoji<Chain<I, Once<ByteOrBreak>>> {
@@ -41,26 +48,29 @@ where
             iter: self.iter.chain(once(ByteOrBreak::TemporaryBreak)),
             input_data: self.input_data,
             defined_bits: self.defined_bits,
-            queued_emoji: self.queued_emoji
+            queued_emoji: self.queued_emoji,
         }
     }
 
-    pub fn chain_emoji_bytes<I2>(self, other : EncodeBytesAsEmoji<I2>) -> EncodeBytesAsEmoji<Chain<I, I2>>
+    pub fn chain_emoji_bytes<I2>(
+        self,
+        other: EncodeBytesAsEmoji<I2>,
+    ) -> EncodeBytesAsEmoji<Chain<I, I2>>
     where
-        I2: Iterator<Item = ByteOrBreak>
+        I2: Iterator<Item = ByteOrBreak>,
     {
         EncodeBytesAsEmoji {
             iter: self.iter.chain(other.iter),
             input_data: self.input_data,
             defined_bits: self.defined_bits,
-            queued_emoji: self.queued_emoji
+            queued_emoji: self.queued_emoji,
         }
     }
 }
 
 impl<I> Iterator for EncodeBytesAsEmoji<I>
 where
-    I: Iterator<Item = ByteOrBreak>
+    I: Iterator<Item = ByteOrBreak>,
 {
     type Item = char;
     fn next(&mut self) -> Option<char> {
@@ -75,9 +85,11 @@ where
                 Some(ByteOrBreak::Byte(b)) => b,
                 None => break,
                 Some(ByteOrBreak::TemporaryBreak) => {
-                    let stop_emoji = constants::usize_to_emoji(usize::try_from(constants::STOP_EMOJI_VALUE).unwrap());
+                    let stop_emoji = constants::usize_to_emoji(
+                        usize::try_from(constants::STOP_EMOJI_VALUE).unwrap(),
+                    );
                     self.queued_emoji.push_back(stop_emoji);
-                    break
+                    break;
                 }
             };
 
@@ -102,7 +114,9 @@ where
         // emoji and stash away the remaining information so it will be returned on the next next()
         if self.defined_bits > 0 {
             let padding = constants::BITS_PER_EMOJI - self.defined_bits;
-            let truncate_bits_emoji = constants::usize_to_emoji(usize::try_from(constants::MAX_EMOJI_VALUE + padding).unwrap());
+            let truncate_bits_emoji = constants::usize_to_emoji(
+                usize::try_from(constants::MAX_EMOJI_VALUE + padding).unwrap(),
+            );
 
             self.defined_bits = 0;
             let final_emoji = constants::usize_to_emoji(self.input_data << padding);
@@ -114,50 +128,45 @@ where
             self.queued_emoji.push_front(truncate_bits_emoji);
         }
 
-        return self.queued_emoji.pop_front()
+        return self.queued_emoji.pop_front();
     }
 }
 
 pub enum ByteOrBreak {
     Byte(u8),
-    TemporaryBreak
+    TemporaryBreak,
 }
 
-fn wrap_byte(b : u8) -> ByteOrBreak {
+fn wrap_byte(b: u8) -> ByteOrBreak {
     ByteOrBreak::Byte(b)
 }
 
 // implementations
-impl<I : Iterator<Item = ByteOrBreak>> Emojfuscate<I> for I
-{
+impl<I: Iterator<Item = ByteOrBreak>> Emojfuscate<I> for I {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
         EncodeBytesAsEmoji::new(self)
     }
 }
 
-impl<I : Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteOrBreak>> for I
-{
+impl<I: Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteOrBreak>> for I {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteOrBreak>> {
         EncodeBytesAsEmoji::new(self.map(wrap_byte))
     }
 }
 
-impl Emojfuscate<Empty<ByteOrBreak>> for ()
-{
+impl Emojfuscate<Empty<ByteOrBreak>> for () {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Empty<ByteOrBreak>> {
         EncodeBytesAsEmoji::new(empty::<ByteOrBreak>())
     }
 }
 
-impl Emojfuscate<Once<ByteOrBreak>> for bool
-{
+impl Emojfuscate<Once<ByteOrBreak>> for bool {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteOrBreak>> {
         <bool as Into<u8>>::into(self).emojfuscate_stream()
     }
 }
 
-impl Emojfuscate<IntoIter<ByteOrBreak, 4>> for char
-{
+impl Emojfuscate<IntoIter<ByteOrBreak, 4>> for char {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteOrBreak, 4>> {
         (self as u32).emojfuscate_stream()
     }
@@ -235,62 +244,83 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 8>> for f64 {
     }
 }
 
-impl Emojfuscate<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>> for String
+impl Emojfuscate<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>>
+    for String
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>> {
-        self.into_bytes().into_iter().emojfuscate_stream().add_stop_emoji()
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>,
+    > {
+        self.into_bytes()
+            .into_iter()
+            .emojfuscate_stream()
+            .add_stop_emoji()
     }
 }
 
-impl Emojfuscate<FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>> for Uuid {
-    fn emojfuscate_stream(self) ->
-        EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>>
-    {
+impl
+    Emojfuscate<
+        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>,
+    > for Uuid
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteOrBreak>, fn(u8) -> Once<ByteOrBreak>>,
+    > {
         return self.into_bytes().emojfuscate_stream();
     }
 }
 
-impl<A, IA, const S : usize> Emojfuscate<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>> for [A; S]
+impl<A, IA, const S: usize> Emojfuscate<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>>
+    for [A; S]
 where
     A: Emojfuscate<IA>,
-    IA: Iterator<Item = ByteOrBreak>
+    IA: Iterator<Item = ByteOrBreak>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>>
-    {
-        self
-            .into_iter()
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>> {
+        self.into_iter()
             .flat_map(get_emojfuscate_iter as fn(A) -> IA)
             .emojfuscate_stream()
     }
 }
 
-fn get_emojfuscate_iter<A, I>(a : A) -> I
+fn get_emojfuscate_iter<A, I>(a: A) -> I
 where
     A: Emojfuscate<I>,
-    I: Iterator<Item = ByteOrBreak>
+    I: Iterator<Item = ByteOrBreak>,
 {
     a.emojfuscate_stream().iter
 }
 
-
-impl<A, IA> Emojfuscate<Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>> for Vec<A>
+impl<A, IA>
+    Emojfuscate<Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>>
+    for Vec<A>
 where
     A: Emojfuscate<IA>,
-    IA: Iterator<Item = ByteOrBreak>
+    IA: Iterator<Item = ByteOrBreak>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>> {
-        let element_count =
-            match u16::try_from(self.len()) {
-                Ok(count) => count,
-                // TODO: is there a more graceful way to handle this?
-                Err(err) => panic!("can't emojfuscate lists that are longer than 2^16 elements, {}", err)
-            };
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<IntoIter<ByteOrBreak, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>,
+    > {
+        let element_count = match u16::try_from(self.len()) {
+            Ok(count) => count,
+            // TODO: is there a more graceful way to handle this?
+            Err(err) => panic!(
+                "can't emojfuscate lists that are longer than 2^16 elements, {}",
+                err
+            ),
+        };
 
-        let content_data =
-            self
-                .into_iter()
-                .flat_map(get_emojfuscate_iter as fn(A) -> IA)
-                .emojfuscate_stream();
+        let content_data = self
+            .into_iter()
+            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
+            .emojfuscate_stream();
 
         return element_count
             .emojfuscate_stream()
@@ -301,14 +331,15 @@ where
 impl<A, IA> Emojfuscate<Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>> for Option<A>
 where
     A: Emojfuscate<IA>,
-    IA: Iterator<Item = ByteOrBreak>
+    IA: Iterator<Item = ByteOrBreak>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>> {
-        let constructor_discriminator
-            = match self {
-                None => 0u8,
-                Some(_) => 1
-            };
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>> {
+        let constructor_discriminator = match self {
+            None => 0u8,
+            Some(_) => 1,
+        };
 
         let iter = self
             .map(get_emojfuscate_iter as fn(A) -> IA)
@@ -321,26 +352,36 @@ where
     }
 }
 
-impl<A, B, IA, IB> Emojfuscate<Chain<Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>>> for Result<A, B>
+impl<A, B, IA, IB>
+    Emojfuscate<
+        Chain<
+            Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>,
+            Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>,
+        >,
+    > for Result<A, B>
 where
     A: Emojfuscate<IA>,
     B: Emojfuscate<IB>,
     IA: Iterator<Item = ByteOrBreak>,
-    IB: Iterator<Item = ByteOrBreak>
+    IB: Iterator<Item = ByteOrBreak>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>>>
-    {
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<
+            Chain<Once<ByteOrBreak>, Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IA>>>>,
+            Chain<Once<ByteOrBreak>, Flatten<std::option::IntoIter<IB>>>,
+        >,
+    > {
         match self {
-            Ok(x) =>
-                0u8
-                    .emojfuscate_stream()
-                    .chain_emoji_bytes(Some(x).emojfuscate_stream())
-                    .chain_emoji_bytes(None::<B>.emojfuscate_stream()),
-            Err(x) =>
-                1u8
-                    .emojfuscate_stream()
-                    .chain_emoji_bytes(None::<A>.emojfuscate_stream())
-                    .chain_emoji_bytes(Some(x).emojfuscate_stream())
+            Ok(x) => 0u8
+                .emojfuscate_stream()
+                .chain_emoji_bytes(Some(x).emojfuscate_stream())
+                .chain_emoji_bytes(None::<B>.emojfuscate_stream()),
+            Err(x) => 1u8
+                .emojfuscate_stream()
+                .chain_emoji_bytes(None::<A>.emojfuscate_stream())
+                .chain_emoji_bytes(Some(x).emojfuscate_stream()),
         }
     }
 }
@@ -350,7 +391,7 @@ where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
     I1: Iterator<Item = ByteOrBreak>,
-    I2: Iterator<Item = ByteOrBreak>
+    I2: Iterator<Item = ByteOrBreak>,
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
         let (a, b) = self;
@@ -367,7 +408,7 @@ where
     C: Emojfuscate<IC>,
     IA: Iterator<Item = ByteOrBreak>,
     IB: Iterator<Item = ByteOrBreak>,
-    IC: Iterator<Item = ByteOrBreak>
+    IC: Iterator<Item = ByteOrBreak>,
 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<IA, IB>, IC>> {
         let (a, b, c) = self;
@@ -377,4 +418,3 @@ where
             .chain_emoji_bytes(c.emojfuscate_stream());
     }
 }
-

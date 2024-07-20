@@ -1,31 +1,29 @@
-
 pub struct HexStream<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = u8>,
 {
-    iter: I
+    iter: I,
 }
 
 impl<I> HexStream<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = u8>,
 {
-    pub fn new(iter : I) -> Self {
+    pub fn new(iter: I) -> Self {
         Self { iter }
     }
 }
 
-
 impl<I> Iterator for HexStream<I>
 where
-    I: Iterator<Item = u8>
+    I: Iterator<Item = u8>,
 {
     type Item = u8;
     fn next(&mut self) -> Option<u8> {
         let m_nybble1 = self.iter.next();
         let m_nybble2 = self.iter.next();
 
-        match(m_nybble1, m_nybble2) {
+        match (m_nybble1, m_nybble2) {
             (Some(nybble1), Some(nybble2)) => {
                 let mut output = 0;
 
@@ -50,9 +48,11 @@ where
                 }
 
                 return Some(output);
-            },
-            (None, None) => { return None },
-            _ => { panic!("expected hex characters to come in pairs of two") }
+            }
+            (None, None) => return None,
+            _ => {
+                panic!("expected hex characters to come in pairs of two")
+            }
         }
     }
 }
