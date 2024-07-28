@@ -21,3 +21,6 @@ arrayvec = "0.7.4"
 clap = { version = "4.5.4", features = ["derive"] }
 hex = "0.4.3"
 uuid = "1.8.0"
+quote = "1.0.36"
+syn = "2.0.71"
+emojfuscate_proc_macro = { path = "emojfuscate_proc_macro" }

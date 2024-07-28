@@ -5,9 +5,13 @@ pub mod hex_stream;
 
 #[cfg(test)]
 mod tests {
-    use crate::demojfuscate::Demojfuscate;
-    use crate::emojfuscate::Emojfuscate;
+    use crate::demojfuscate::{
+        ConstructFromEmoji, DecodeEmojiToBytes, Demojfuscate, FromEmojiError,
+    };
+    use crate::emojfuscate::{ByteOrBreak, Emojfuscate, EncodeBytesAsEmoji};
+    use emojfuscate_proc_macro::*;
     use proptest::prelude::*;
+    use std::iter::Once;
     use uuid::uuid;
 
     // there's no Arbitrary instance for Uuid :(
@@ -203,6 +207,19 @@ mod tests {
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_derive_struct(age : u8, name : String) {
+            #[derive(ConstructFromEmoji, Debug, PartialEq)]
+            pub struct Person {
+                age: u8,
+                name: String
+            }
+
+            let emojified = (age, name.clone()).clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(Person { age, name }), "emojfuscated version: {}", emojified);
         }
     }
 }
