@@ -40,86 +40,87 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
 // Generate an expression to sum up the heap size of each field.
 fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
     match *data {
-        Data::Struct(ref data) => {
-            match data.fields {
-                Fields::Named(ref fields) => {
-                    let declare_fields = fields.named.iter().map(|f| {
-                        let name = &f.ident;
-                        let field_type = &f.ty;
-                        quote_spanned! {f.span()=>
-                            let #name = match #field_type::construct_from_emoji(byte_stream) {
-                                Err(err) => return Err(err),
-                                Ok((result, new_byte_stream)) => {
-                                    byte_stream = new_byte_stream;
-                                    result
-                                }
-                            };
-
-                        }
-                    });
-
-                    let field_constructors = fields.named.iter().map(|f| {
-                        let name = &f.ident;
-
-                        quote_spanned! {f.span()=>
-                            #name: #name,
-                        }
-                    });
-
-                    quote! {
-                        #(#declare_fields)*
-
-                        return Ok((
-                            #name {
-                                #(#field_constructors)*
-                            },
-                            byte_stream
-                        ));
-                    }
-                }
-                Fields::Unnamed(ref fields) => {
-                    let declare_fields = fields.unnamed.iter().enumerate().map(|(i, f)| {
-                        let name = Ident::new(&format!("field{}", i), Span::call_site());
-                        let field_type = &f.ty;
-                        quote_spanned! {f.span()=>
-                            let #name = match #field_type::construct_from_emoji(byte_stream) {
-                                Err(err) => return Err(err),
-                                Ok((result, new_byte_stream)) => {
-                                    byte_stream = new_byte_stream;
-                                    result
-                                }
-                            };
-
-                        }
-                    });
-
-                    let field_constructors = fields.unnamed.iter().enumerate().map(|(i, f)| {
-                        let name = Ident::new(&format!("field{}", i), Span::call_site());
-
-                        quote_spanned! {f.span()=>
-                            #name,
-                        }
-                    });
-
-                    quote! {
-                        #(#declare_fields)*
-
-                        return Ok((
-                            #name (
-                                #(#field_constructors)*
-                            ),
-                            byte_stream
-                        ));
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let declare_fields = fields.named.iter().map(|f| {
+                    let name = &f.ident;
+                    let field_type = &f.ty;
+                    quote_spanned! {f.span()=>
+                        let #name = match #field_type::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((result, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                result
+                            }
+                        };
 
                     }
-                }
-                Fields::Unit => {
-                    panic!("deriving ConstructFromEmoji is not supported for unit struct");
-                    // Unit structs cannot own more than 0 bytes of heap memory.
-                    // quote!(0)
+                });
+
+                let field_constructors = fields.named.iter().map(|f| {
+                    let name = &f.ident;
+
+                    quote_spanned! {f.span()=>
+                        #name: #name,
+                    }
+                });
+
+                quote! {
+                    #(#declare_fields)*
+
+                    return Ok((
+                        #name {
+                            #(#field_constructors)*
+                        },
+                        byte_stream
+                    ));
                 }
             }
-        }
+            Fields::Unnamed(ref fields) => {
+                let declare_fields = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                    let name = Ident::new(&format!("field{}", i), Span::call_site());
+                    let field_type = &f.ty;
+                    quote_spanned! {f.span()=>
+                        let #name = match #field_type::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((result, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                result
+                            }
+                        };
+
+                    }
+                });
+
+                let field_constructors = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                    let name = Ident::new(&format!("field{}", i), Span::call_site());
+
+                    quote_spanned! {f.span()=>
+                        #name,
+                    }
+                });
+
+                quote! {
+                    #(#declare_fields)*
+
+                    return Ok((
+                        #name (
+                            #(#field_constructors)*
+                        ),
+                        byte_stream
+                    ));
+
+                }
+            }
+            Fields::Unit => {
+                quote!(
+                    return Ok((
+                        #name,
+                        byte_stream
+                    ));
+                )
+            }
+        },
         Data::Enum(_) | Data::Union(_) => unimplemented!(),
     }
 }

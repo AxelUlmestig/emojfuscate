@@ -42,6 +42,21 @@ mod tests {
         );
     }
 
+    #[test]
+    fn emojfuscate_derive_construct_from_emoji_unit_struct() {
+        #[derive(ConstructFromEmoji, Debug, PartialEq)]
+        struct UnitStruct;
+
+        let emojified = ().emojfuscate();
+        let roundtrip_message = emojified.clone().demojfuscate();
+        assert_eq!(
+            roundtrip_message,
+            Ok(UnitStruct),
+            "emojfuscated version: {}",
+            emojified
+        );
+    }
+
     proptest! {
         #[test]
         fn emojfuscate_bool(original_message : bool) {
