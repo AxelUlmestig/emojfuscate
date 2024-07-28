@@ -210,9 +210,9 @@ mod tests {
         }
 
         #[test]
-        fn emojfuscate_derive_struct(age : u8, name : String) {
+        fn emojfuscate_derive_construct_from_emoji_named_fields(age : u8, name : String) {
             #[derive(ConstructFromEmoji, Debug, PartialEq)]
-            pub struct Person {
+            struct Person {
                 age: u8,
                 name: String
             }
@@ -220,6 +220,16 @@ mod tests {
             let emojified = (age, name.clone()).clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(Person { age, name }), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_derive_construct_from_emoji_tuple_struct(age : u8, name : String) {
+            #[derive(ConstructFromEmoji, Debug, PartialEq)]
+            struct Person(u8, String);
+
+            let emojified = (age, name.clone()).clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(Person(age, name)), "emojfuscated version: {}", emojified);
         }
     }
 }

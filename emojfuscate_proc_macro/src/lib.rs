@@ -1,8 +1,8 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::spanned::Spanned;
 use syn::{
-    parse_macro_input, parse_quote, Data, DeriveInput, Fields, GenericParam, Generics, Ident, Index,
+    parse_macro_input, parse_quote, Data, DeriveInput, Fields, GenericParam, Generics, Ident,
 };
 
 #[proc_macro_derive(ConstructFromEmoji)]
@@ -47,7 +47,6 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
                         let name = &f.ident;
                         let field_type = &f.ty;
                         quote_spanned! {f.span()=>
-
                             let #name = match #field_type::construct_from_emoji(byte_stream) {
                                 Err(err) => return Err(err),
                                 Ok((result, new_byte_stream)) => {
@@ -55,6 +54,7 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
                                     result
                                 }
                             };
+
                         }
                     });
 
@@ -77,28 +77,47 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
                         ));
                     }
                 }
-                /*
                 Fields::Unnamed(ref fields) => {
-                    // Expands to an expression like
-                    //
-                    //     0 + self.0.heap_size() + self.1.heap_size() + self.2.heap_size()
-                    let recurse = fields.unnamed.iter().enumerate().map(|(i, f)| {
-                        let index = Index::from(i);
+                    let declare_fields = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                        let name = Ident::new(&format!("field{}", i), Span::call_site());
+                        let field_type = &f.ty;
                         quote_spanned! {f.span()=>
+                            let #name = match #field_type::construct_from_emoji(byte_stream) {
+                                Err(err) => return Err(err),
+                                Ok((result, new_byte_stream)) => {
+                                    byte_stream = new_byte_stream;
+                                    result
+                                }
+                            };
 
-                            heapsize::HeapSize::heap_size_of_children(&self.#index)
                         }
                     });
+
+                    let field_constructors = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                        let name = Ident::new(&format!("field{}", i), Span::call_site());
+
+                        quote_spanned! {f.span()=>
+                            #name,
+                        }
+                    });
+
                     quote! {
-                        0 #(+ #recurse)*
+                        #(#declare_fields)*
+
+                        return Ok((
+                            #name (
+                                #(#field_constructors)*
+                            ),
+                            byte_stream
+                        ));
+
                     }
                 }
                 Fields::Unit => {
+                    panic!("deriving ConstructFromEmoji is not supported for unit struct");
                     // Unit structs cannot own more than 0 bytes of heap memory.
-                    quote!(0)
+                    // quote!(0)
                 }
-                */
-                _ => panic!("only named fields are supproted"),
             }
         }
         Data::Enum(_) | Data::Union(_) => unimplemented!(),
