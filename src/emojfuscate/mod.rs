@@ -11,7 +11,7 @@ mod tests {
     use crate::emojfuscate::{ByteOrBreak, Emojfuscate, EncodeBytesAsEmoji};
     use emojfuscate_proc_macro::*;
     use proptest::prelude::*;
-    use std::iter::Once;
+    use std::iter::Chain;
     use uuid::uuid;
 
     // there's no Arbitrary instance for Uuid :(
@@ -225,16 +225,18 @@ mod tests {
         }
 
         #[test]
-        fn emojfuscate_derive_construct_from_emoji_named_fields(age : u8, name : String) {
-            #[derive(ConstructFromEmoji, Debug, PartialEq)]
+        fn emojfuscate_derive_construct_from_emoji_named_fields(age : u8, name : String, is_cool : bool) {
+            #[derive(ConstructFromEmoji, Emojfuscate, Debug, PartialEq, Clone)]
             struct Person {
                 age: u8,
-                name: String
+                name: String,
+                is_cool: bool
             }
 
-            let emojified = (age, name.clone()).clone().emojfuscate();
+            let original_message = Person { age, name, is_cool };
+            let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
-            assert_eq!(roundtrip_message, Ok(Person { age, name }), "emojfuscated version: {}", emojified);
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
 
         #[test]
