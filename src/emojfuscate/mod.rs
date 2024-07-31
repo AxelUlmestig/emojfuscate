@@ -225,15 +225,15 @@ mod tests {
         }
 
         #[test]
-        fn emojfuscate_derive_construct_from_emoji_named_fields(age : u8, name : String, is_cool : bool) {
+        fn emojfuscate_derive_construct_from_emoji_named_fields(age : u8, name : String, luggage : bool) {
             #[derive(ConstructFromEmoji, Emojfuscate, Debug, PartialEq, Clone)]
-            struct Person {
+            struct Person<A> {
                 age: u8,
                 name: String,
-                is_cool: bool
+                luggage: A
             }
 
-            let original_message = Person { age, name, is_cool };
+            let original_message : Person<bool> = Person { age, name, luggage };
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);

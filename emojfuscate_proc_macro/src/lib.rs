@@ -1,14 +1,12 @@
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
+use std::iter::once;
 use syn::spanned::Spanned;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Ident};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, GenericParam, Ident};
 
 #[proc_macro_derive(Emojfuscate)]
 pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    // Parse the input tokens into a syntax tree.
     let input = parse_macro_input!(raw_input as DeriveInput);
-
-    // Used in the quasi-quotation below as `#name`.
     let name = input.ident;
 
     let expanded = match input.data {
@@ -45,22 +43,37 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     quote! {Chain<#chain, #element>}
                 });
 
+                let generics = input
+                    .generics
+                    .params
+                    .iter()
+                    .filter_map(|p| match p {
+                        GenericParam::Type(type_param) => {
+                            let ident = &type_param.ident;
+                            Some(quote! {#ident})
+                        }
+                        _ => None,
+                    })
+                    .chain(iterator_names);
+
+                let (_, ty_generics, _) = input.generics.split_for_impl();
+
                 /*
-                For a struct with named fields, e.g.
+                // For a struct with named fields, e.g.
 
                 struct Person {
                     age: u8,
                     name: String,
-                    is_cool: bool
+                    luggage: A
                 }
 
-                It should generate code that looks like this:
+                // It should generate code that looks like this:
 
-                impl<I1, I2, I3> Emojfuscate<Chain<Chain<I1, I2>, I3>> for Person
+                impl<I1, I2, I3, A> Emojfuscate<Chain<Chain<I1, I2>, I3>> for Person<A>
                 where
                     u8: Emojfuscate<I1>,
                     String: Emojfuscate<I2>,
-                    bool: Emojfuscate<I3>,
+                    A: Emojfuscate<I3>,
                     I1: Iterator<Item = ByteOrBreak>,
                     I2: Iterator<Item = ByteOrBreak>,
                     I3: Iterator<Item = ByteOrBreak>,
@@ -69,13 +82,13 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                         return self.age
                             .emojfuscate_stream()
                             .chain_emoji_bytes(self.name.emojfuscate_stream())
-                            .chain_emoji_bytes(self.is_cool.emojfuscate_stream());
+                            .chain_emoji_bytes(self.luggage.emojfuscate_stream());
                     }
                 }
                 */
 
                 quote! {
-                    impl<#(#iterator_names),*> Emojfuscate<#iterator_chain> for #name
+                    impl<#(#generics),*> Emojfuscate<#iterator_chain> for #name #ty_generics
                     where
                         #(#field_types)*
                     {
@@ -90,57 +103,110 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
         _ => panic!("not implemented"),
     };
 
-    /*
-    let expanded = quote! {
-        impl<I> Emojfuscate<I> for #name
-        where
-            I: Iterator<Item = ByteOrBreak>,
-        {
-            fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
-                panic!("not implemented");
-            }
-        }
-    };
-    */
-
-    // Hand the output tokens back to the compiler.
     return proc_macro::TokenStream::from(expanded);
 }
 
 #[proc_macro_derive(ConstructFromEmoji)]
 pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    // Parse the input tokens into a syntax tree.
     let input = parse_macro_input!(raw_input as DeriveInput);
-
-    // Used in the quasi-quotation below as `#name`.
     let name = input.ident;
 
-    // // Add a bound `T: ConstructFromEmoji` to every type parameter T.
-    // let generics = add_trait_bounds(input.generics);
-    // let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+    let (_, ty_generics, _) = input.generics.split_for_impl();
 
-    // // Generate an expression to sum up the heap size of each field.
     let demojfuscated_fields = demojfuscate_fields(&input.data, &name);
 
+    // <I, ...> where ... are any generics from the type implementing ConstructFromEmoji
+    let generics = input
+        .generics
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            GenericParam::Type(type_param) => {
+                let ident = &type_param.ident;
+                Some(quote! {#ident})
+            }
+            _ => None,
+        })
+        .chain(once(quote! {I}));
+
+    let implementations = input.generics.params.iter().filter_map(|p| match p {
+        GenericParam::Type(type_param) => {
+            let ident = &type_param.ident;
+            Some(quote! {#ident: ConstructFromEmoji<#ident, I>,
+            })
+        }
+        _ => None,
+    });
+
+    /*
+    // For a struct with named fields, e.g.
+
+    struct Person {
+        age: u8,
+        name: String,
+        luggage: A
+    }
+
+    // It should generate code that looks like this:
+
+    impl <A, I> ConstructFromEmoji <Person<A>, I> for Person <A>
+    where
+        I: Iterator <Item = u8>,
+        A: ConstructFromEmoji <A, I>,
+    {
+        fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes <I>)
+            -> Result <(Person<A>, DecodeEmojiToBytes <I>), FromEmojiError>
+        {
+            let age = match u8::construct_from_emoji(byte_stream)
+                {
+                    Err(err) => return Err(err),
+                    Ok((result, new_byte_stream)) => {
+                        byte_stream = new_byte_stream;
+                        result
+                    }
+                };
+
+            let name = match String::construct_from_emoji(byte_stream)
+                {
+                    Err(err) => return Err(err),
+                    Ok((result, new_byte_stream)) => {
+                        byte_stream = new_byte_stream;
+                        result
+                    }
+                };
+
+            let luggage = match A::construct_from_emoji(byte_stream)
+            {
+                Err(err) => return Err(err),
+                Ok((result, new_byte_stream)) => {
+                    byte_stream = new_byte_stream;
+                    result
+                }
+            };
+
+            return Ok((Person { age : age, name : name, luggage : luggage, }, byte_stream));
+        }
+    }
+    */
+
     let expanded = quote! {
-        impl<I> ConstructFromEmoji<#name, I> for #name
+        impl<#(#generics),*> ConstructFromEmoji<#name #ty_generics, I> for #name #ty_generics
         where
             I: Iterator<Item = u8>,
+            #(#implementations)*
         {
             fn construct_from_emoji(
                 mut byte_stream: DecodeEmojiToBytes<I>,
-            ) -> Result<(#name, DecodeEmojiToBytes<I>), FromEmojiError> {
+            ) -> Result<(#name #ty_generics, DecodeEmojiToBytes<I>), FromEmojiError> {
                 #demojfuscated_fields
             }
         }
     };
 
-    // Hand the output tokens back to the compiler.
     return proc_macro::TokenStream::from(expanded);
 }
 
-// Generate an expression to sum up the heap size of each field.
-fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
+fn demojfuscate_fields(data: &Data, type_name: &Ident) -> TokenStream {
     match *data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
@@ -171,7 +237,7 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
                     #(#declare_fields)*
 
                     return Ok((
-                        #name {
+                        #type_name {
                             #(#field_constructors)*
                         },
                         byte_stream
@@ -206,7 +272,7 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
                     #(#declare_fields)*
 
                     return Ok((
-                        #name (
+                        #type_name (
                             #(#field_constructors)*
                         ),
                         byte_stream
@@ -217,7 +283,7 @@ fn demojfuscate_fields(data: &Data, name: &Ident) -> TokenStream {
             Fields::Unit => {
                 quote!(
                     return Ok((
-                        #name,
+                        #type_name,
                         byte_stream
                     ));
                 )
