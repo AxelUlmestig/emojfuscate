@@ -373,6 +373,19 @@ where
     }
 }
 
+/*
+impl<A, I> Emojfuscate<I> for (A,)
+where
+    A: Emojfuscate<I>,
+    I: Iterator<Item = ByteOrBreak>,
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+        let (a,) = self;
+        return a.emojfuscate_stream();
+    }
+}
+*/
+
 impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
 where
     A: Emojfuscate<I1>,

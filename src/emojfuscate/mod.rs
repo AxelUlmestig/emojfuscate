@@ -11,7 +11,7 @@ mod tests {
     use crate::emojfuscate::{ByteOrBreak, Emojfuscate, EncodeBytesAsEmoji};
     use emojfuscate_proc_macro::*;
     use proptest::prelude::*;
-    use std::iter::Chain;
+    use std::iter::{Chain, Once};
     use uuid::uuid;
 
     // there's no Arbitrary instance for Uuid :(
@@ -44,10 +44,10 @@ mod tests {
 
     #[test]
     fn emojfuscate_derive_construct_from_emoji_unit_struct() {
-        #[derive(ConstructFromEmoji, Debug, PartialEq)]
+        #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq)]
         struct UnitStruct;
 
-        let emojified = ().emojfuscate();
+        let emojified = UnitStruct.emojfuscate();
         let roundtrip_message = emojified.clone().demojfuscate();
         assert_eq!(
             roundtrip_message,
@@ -271,6 +271,91 @@ mod tests {
             struct Person<A>(u8, String, A);
 
             let original_message = Person(age, name, luggage);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_derive_enum(input : Result<(bool, String), u32>) {
+            // #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
+            #[derive(Debug, PartialEq, Clone)]
+            enum Animal {
+                Cat(bool, String),
+                Dog(u32)
+            }
+
+            impl<IA, IB> Emojfuscate<Chain<Chain<Once<ByteOrBreak>, IA>, IB>> for Animal
+            where
+                Option<(bool, String)>: Emojfuscate<IA>,
+                Option<u32>: Emojfuscate<IB>,
+                IA: Iterator<Item = ByteOrBreak>,
+                IB: Iterator<Item = ByteOrBreak>,
+            {
+                fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteOrBreak>, IA>, IB>> {
+                    match self {
+                        Animal::Cat(b,s) => {
+                            0u8
+                                .emojfuscate_stream()
+                                .chain_emoji_bytes(Some((b,s)).emojfuscate_stream())
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                        },
+                        Animal::Dog(i) => {
+                            1u8
+                                .emojfuscate_stream()
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                                .chain_emoji_bytes(Some(i).emojfuscate_stream())
+                        }
+                    }
+                }
+            }
+
+            impl<I> ConstructFromEmoji<Animal, I> for Animal
+            where
+                I: Iterator<Item = u8>,
+            {
+                fn construct_from_emoji(
+                    mut byte_stream: DecodeEmojiToBytes<I>,
+                ) -> Result<(Animal, DecodeEmojiToBytes<I>), FromEmojiError> {
+                    let constructor_discriminator =
+                        match u8::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((n, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                n
+                            }
+                        };
+
+                    let constructor0 =
+                        match Option::<(bool, String)>::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((x, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                x
+                            }
+                        };
+
+                    let constructor1 =
+                        match Option::<u32>::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((x, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                x
+                            }
+                        };
+
+                    match (constructor_discriminator, constructor0, constructor1) {
+                        (0, Some((b, s)), None) => Ok((Animal::Cat(b, s), byte_stream)),
+                        (1, None, Some(i)) => Ok((Animal::Dog(i), byte_stream)),
+                        _ => Err(FromEmojiError::UnexpectedInput("Constructor choice and data don't agree when demojfuscating Animal".to_string()))
+                    }
+                }
+            }
+
+            let original_message = match input {
+                Ok((b, s)) => Animal::Cat(b, s),
+                Err(i) => Animal::Dog(i)
+            };
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);

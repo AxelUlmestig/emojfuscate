@@ -117,18 +117,6 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     .reduce(|prev, f| {
                         quote_spanned! {f.span()=>#prev.chain_emoji_bytes(#f)}
                     });
-                /*
-                let chained_fields = fields
-                    .unnamed
-                    .iter()
-                    .map(|f| {
-                        let name = &f.ident;
-                        quote_spanned! {f.span()=>#name.emojfuscate_stream()}
-                    })
-                    .reduce(|prev, f| {
-                        quote_spanned! {f.span()=>#prev.chain_emoji_bytes(#f)}
-                    });
-                */
 
                 let field_types = fields.unnamed.iter().zip(iterator_names.clone()).map(
                     |(f, iterator_type_name)| {
@@ -200,7 +188,32 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                 }
             }
             Fields::Unit => {
-                panic!("unit fields are not supported for deriving Emojfuscate");
+                let generics = input
+                    .generics
+                    .params
+                    .iter()
+                    .filter_map(|p| match p {
+                        GenericParam::Type(type_param) => {
+                            let ident = &type_param.ident;
+                            Some(quote! {#ident})
+                        }
+                        _ => None,
+                    })
+                    .chain(once(quote! {I}));
+
+                let (_, ty_generics, _) = input.generics.split_for_impl();
+
+                quote! {
+                    impl<#(#generics),*> Emojfuscate<I> for #name #ty_generics
+                    where
+                        (): Emojfuscate<I>,
+                        I: Iterator<Item = ByteOrBreak>,
+                    {
+                        fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+                            ().emojfuscate_stream()
+                        }
+                    }
+                }
             }
         },
         _ => panic!("not implemented"),

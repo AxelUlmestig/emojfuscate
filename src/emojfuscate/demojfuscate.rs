@@ -518,6 +518,21 @@ where
     }
 }
 
+impl<I, A> ConstructFromEmoji<(A,), I> for (A,)
+where
+    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, I>,
+{
+    fn construct_from_emoji(
+        byte_stream: DecodeEmojiToBytes<I>,
+    ) -> Result<((A,), DecodeEmojiToBytes<I>), FromEmojiError> {
+        return match A::construct_from_emoji(byte_stream) {
+            Err(err) => return Err(err),
+            Ok((result, new_byte_stream)) => Ok(((result,), new_byte_stream)),
+        };
+    }
+}
+
 impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
 where
     I: Iterator<Item = u8>,
