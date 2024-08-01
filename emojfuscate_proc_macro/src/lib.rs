@@ -216,7 +216,242 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                 }
             }
         },
-        _ => panic!("not implemented"),
+        Data::Enum(ref data) => {
+            /*
+            For an enum that looks like this:
+
+            enum Animal {
+                Cat{ likes_cuddles: bool, name: String},
+                Dog(u32),
+                Lizard
+            }
+
+            the generated code should look something like this:
+
+            impl<IA, IB> Emojfuscate<Chain<Chain<Once<ByteOrBreak>, IA>, IB>> for Animal
+            where
+                Option<(bool, String)>: Emojfuscate<IA>,
+                Option<u32>: Emojfuscate<IB>,
+                IA: Iterator<Item = ByteOrBreak>,
+                IB: Iterator<Item = ByteOrBreak>,
+            {
+                fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteOrBreak>, IA>, IB>> {
+                    match self {
+                        Animal::Cat(b,s) => {
+                            0u8
+                                .emojfuscate_stream()
+                                .chain_emoji_bytes(Some((b,s)).emojfuscate_stream())
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                        },
+                        Animal::Dog(i) => {
+                            1u8
+                                .emojfuscate_stream()
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                                .chain_emoji_bytes(Some(i).emojfuscate_stream())
+                        },
+                        Animal::Lizard => {
+                            2u8
+                                .emojfuscate_stream()
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                                .chain_emoji_bytes(None.emojfuscate_stream())
+                        }
+                    }
+                }
+            }
+            */
+
+            let mut trait_constraints = data
+                .variants
+                .iter()
+                .enumerate()
+                .filter_map(|(variant_index, variant)| match variant.fields {
+                    Fields::Named(ref fields) => {
+                        let mut field_types = fields.named.iter().map(|f| &f.ty);
+                        let iterator_name =
+                            Ident::new(&format!("I{}", variant_index), Span::call_site());
+
+                        Some(if field_types.len() == 1 {
+                            let only_field = field_types.next().unwrap();
+
+                            quote! {
+                                Option<#only_field>: Emojfuscate<#iterator_name>,
+                                #iterator_name: Iterator<Item = ByteOrBreak>
+                            }
+                        } else {
+                            quote! {
+                                Option<(#(#field_types),*)>: Emojfuscate<#iterator_name>,
+                                #iterator_name: Iterator<Item = ByteOrBreak>
+                            }
+                        })
+                    }
+                    Fields::Unnamed(ref fields) => {
+                        let mut field_types = fields.unnamed.iter().map(|f| &f.ty);
+                        let iterator_name =
+                            Ident::new(&format!("I{}", variant_index), Span::call_site());
+
+                        Some(if field_types.len() == 1 {
+                            let only_field = field_types.next().unwrap();
+
+                            quote! {
+                                Option<#only_field>: Emojfuscate<#iterator_name>,
+                                #iterator_name: Iterator<Item = ByteOrBreak>
+                            }
+                        } else {
+                            quote! {
+                                Option<(#(#field_types),*)>: Emojfuscate<#iterator_name>,
+                                #iterator_name: Iterator<Item = ByteOrBreak>
+                            }
+                        })
+                    }
+                    Fields::Unit => None,
+                })
+                .peekable();
+
+            let function_body =
+                data
+                    .variants
+                    .iter()
+                    .enumerate()
+                    .map(|(variant_index_usize, variant)| {
+                        let variant_index = variant_index_usize as u8;
+
+                        match variant.fields {
+                            Fields::Named(ref fields) => {
+                                let variant_name = &variant.ident;
+                                let field_names = fields.named.iter()
+                                        .map(|f| {
+                                            let field_name = &f.ident;
+                                            quote_spanned! {f.span()=>#field_name}
+                                        });
+
+                                let fields_to_emojfuscate =
+                                    data.variants.iter().enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    }).map(|(i, _)| {
+                                    if i as u8 == variant_index {
+                                        let field_names2 = fields.named.iter()
+                                                .map(|f| {
+                                                    let field_name = &f.ident;
+                                                    quote_spanned! {f.span()=>#field_name}
+                                                });
+
+                                        quote! {
+                                            .chain_emoji_bytes(Some((#(#field_names2),*)).emojfuscate_stream())
+                                        }
+                                    } else {
+                                        quote! {
+                                            .chain_emoji_bytes(None.emojfuscate_stream())
+                                        }
+                                    }
+                                });
+
+                                quote! {
+                                    #name::#variant_name{#(#field_names),*} => {
+                                        #variant_index.emojfuscate_stream()
+                                        #(#fields_to_emojfuscate)*
+                                    }
+                                }
+                            }
+                            Fields::Unnamed(ref fields) => {
+                                let variant_name = &variant.ident;
+                                let field_names = fields.unnamed.iter();
+
+                                let fields_to_emojfuscate =
+                                    data.variants.iter().enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    }).map(|(i, _)| {
+                                    if i as u8 == variant_index {
+                                        let field_names2 = fields.unnamed.iter();
+
+                                        quote! {
+                                            .chain_emoji_bytes(Some((#(#field_names2),*)).emojfuscate_stream())
+                                        }
+                                    } else {
+                                        quote! {
+                                            .chain_emoji_bytes(None.emojfuscate_stream())
+                                        }
+                                    }
+                                });
+
+                                quote! {
+                                    #name::#variant_name(#(#field_names),*) => {
+                                        #variant_index.emojfuscate_stream()
+                                        #(#fields_to_emojfuscate)*
+                                    }
+                                }
+                            },
+                            Fields::Unit => {
+                                let fields_to_emojfuscate =
+                                    data.variants.iter().enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    }).map(|_| {
+                                        quote! {
+                                            .chain_emoji_bytes(None.emojfuscate_stream())
+                                        }
+                                });
+
+                                let variant_name = &variant.ident;
+
+                                quote! {
+                                    #name::#variant_name => {
+                                        #variant_index.emojfuscate_stream()
+                                        #(#fields_to_emojfuscate)*
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+            let iterator_names = data
+                .variants
+                .iter()
+                .filter(|v| match v.fields {
+                    Fields::Unit => false,
+                    _ => true,
+                })
+                .enumerate()
+                .map(|(i, _)| {
+                    let ident = Ident::new(&format!("I{}", i), Span::call_site());
+                    quote! {#ident}
+                });
+
+            let iterator_chain_type = once(quote! {Once<ByteOrBreak>})
+                .chain(iterator_names.clone())
+                .reduce(|chain, element| {
+                    quote! {Chain<#chain, #element>}
+                });
+
+            let where_clause = match trait_constraints.peek() {
+                Some(_) => {
+                    quote! {
+                        where
+                            #(#trait_constraints),*
+                    }
+                }
+                None => {
+                    quote! {}
+                }
+            };
+
+            quote! {
+                impl<#(#iterator_names),*> Emojfuscate<#iterator_chain_type> for #name
+                #where_clause
+                {
+                    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<#iterator_chain_type> {
+                        match self {
+                            #(#function_body)*
+                        }
+                    }
+                }
+            }
+        }
+        Data::Union(_) => unimplemented!(),
     };
 
     return proc_macro::TokenStream::from(expanded);
@@ -405,6 +640,7 @@ fn demojfuscate_fields(data: &Data, type_name: &Ident) -> TokenStream {
                 )
             }
         },
-        Data::Enum(_) | Data::Union(_) => unimplemented!(),
+        Data::Enum(_) => unimplemented!(),
+        Data::Union(_) => unimplemented!(),
     }
 }

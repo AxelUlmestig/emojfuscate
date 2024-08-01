@@ -279,12 +279,14 @@ mod tests {
         #[test]
         fn emojfuscate_derive_enum(input : Result<(bool, String), u32>) {
             // #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
-            #[derive(Debug, PartialEq, Clone)]
+            #[derive(Emojfuscate, Debug, PartialEq, Clone)]
             enum Animal {
-                Cat(bool, String),
-                Dog(u32)
+                Cat{ likes_cuddles: bool, name: String},
+                Dog(u32),
+                Lizard
             }
 
+            /*
             impl<IA, IB> Emojfuscate<Chain<Chain<Once<ByteOrBreak>, IA>, IB>> for Animal
             where
                 Option<(bool, String)>: Emojfuscate<IA>,
@@ -309,6 +311,7 @@ mod tests {
                     }
                 }
             }
+            */
 
             impl<I> ConstructFromEmoji<Animal, I> for Animal
             where
@@ -345,15 +348,16 @@ mod tests {
                         };
 
                     match (constructor_discriminator, constructor0, constructor1) {
-                        (0, Some((b, s)), None) => Ok((Animal::Cat(b, s), byte_stream)),
+                        (0, Some((likes_cuddles, name)), None) => Ok((Animal::Cat{likes_cuddles, name}, byte_stream)),
                         (1, None, Some(i)) => Ok((Animal::Dog(i), byte_stream)),
+                        (2, None, None) => Ok((Animal::Lizard, byte_stream)),
                         _ => Err(FromEmojiError::UnexpectedInput("Constructor choice and data don't agree when demojfuscating Animal".to_string()))
                     }
                 }
             }
 
             let original_message = match input {
-                Ok((b, s)) => Animal::Cat(b, s),
+                Ok((likes_cuddles, name)) => Animal::Cat{likes_cuddles, name},
                 Err(i) => Animal::Dog(i)
             };
             let emojified = original_message.clone().emojfuscate();
