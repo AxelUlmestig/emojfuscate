@@ -277,13 +277,14 @@ mod tests {
         }
 
         #[test]
-        fn emojfuscate_derive_enum(input : Result<(bool, String), u32>) {
-            // #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
-            #[derive(Emojfuscate, Debug, PartialEq, Clone)]
+        fn emojfuscate_derive_enum(input : Result<Option<(bool, String)>, Result<u32, ((), i16)>>) {
+            #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
+            // #[derive(Emojfuscate, Debug, PartialEq, Clone)]
             enum Animal {
-                Cat{ likes_cuddles: bool, name: String},
+                Cat{ likes_cuddles: bool, name: String },
+                Lizard,
                 Dog(u32),
-                Lizard
+                Donkey((), i16)
             }
 
             /*
@@ -313,6 +314,7 @@ mod tests {
             }
             */
 
+            /*
             impl<I> ConstructFromEmoji<Animal, I> for Animal
             where
                 I: Iterator<Item = u8>,
@@ -355,11 +357,32 @@ mod tests {
                     }
                 }
             }
+            */
 
             let original_message = match input {
-                Ok((likes_cuddles, name)) => Animal::Cat{likes_cuddles, name},
-                Err(i) => Animal::Dog(i)
+                Ok(Some((likes_cuddles, name))) => Animal::Cat{likes_cuddles, name},
+                Ok(None) => Animal::Lizard,
+                Err(Ok(i)) => Animal::Dog(i),
+                Err(Err((u, i))) => Animal::Donkey(u, i),
             };
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_derive_enum_generic(input : Option<u8>) {
+            #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
+            enum Maybe<A> {
+                Just(A),
+                Nothing
+            }
+
+            let original_message = match input {
+                Some(x) => Maybe::Just(x),
+                None => Maybe::Nothing
+            };
+
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);

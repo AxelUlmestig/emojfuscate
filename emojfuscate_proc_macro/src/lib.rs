@@ -1,4 +1,4 @@
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::Span;
 use quote::{quote, quote_spanned};
 use std::iter::once;
 use syn::spanned::Spanned;
@@ -411,11 +411,11 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
             let iterator_names = data
                 .variants
                 .iter()
-                .filter(|v| match v.fields {
+                .enumerate()
+                .filter(|(_, v)| match v.fields {
                     Fields::Unit => false,
                     _ => true,
                 })
-                .enumerate()
                 .map(|(i, _)| {
                     let ident = Ident::new(&format!("I{}", i), Span::call_site());
                     quote! {#ident}
@@ -439,8 +439,23 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                 }
             };
 
+            let generics = input
+                .generics
+                .params
+                .iter()
+                .filter_map(|p| match p {
+                    GenericParam::Type(type_param) => {
+                        let ident = &type_param.ident;
+                        Some(quote! {#ident})
+                    }
+                    _ => None,
+                })
+                .chain(iterator_names);
+
+            let (_, ty_generics, _) = input.generics.split_for_impl();
+
             quote! {
-                impl<#(#iterator_names),*> Emojfuscate<#iterator_chain_type> for #name
+                impl<#(#generics),*> Emojfuscate<#iterator_chain_type> for #name #ty_generics
                 #where_clause
                 {
                     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<#iterator_chain_type> {
@@ -464,7 +479,276 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
 
     let (_, ty_generics, _) = input.generics.split_for_impl();
 
-    let demojfuscated_fields = demojfuscate_fields(&input.data, &name);
+    let demojfuscated_fields = match input.data {
+        Data::Struct(ref data) => match data.fields {
+            Fields::Named(ref fields) => {
+                let declare_fields = fields.named.iter().map(|f| {
+                    let field_name = &f.ident;
+                    let field_type = &f.ty;
+                    quote_spanned! {f.span()=>
+                        let #field_name = match #field_type::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((result, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                result
+                            }
+                        };
+
+                    }
+                });
+
+                let field_constructors = fields.named.iter().map(|f| {
+                    let field_name = &f.ident;
+
+                    quote_spanned! {f.span()=>
+                        #field_name: #field_name,
+                    }
+                });
+
+                quote! {
+                    #(#declare_fields)*
+
+                    return Ok((
+                        #name {
+                            #(#field_constructors)*
+                        },
+                        byte_stream
+                    ));
+                }
+            }
+            Fields::Unnamed(ref fields) => {
+                let declare_fields = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                    let field_name = Ident::new(&format!("field{}", i), Span::call_site());
+                    let field_type = &f.ty;
+                    quote_spanned! {f.span()=>
+                        let #field_name = match #field_type::construct_from_emoji(byte_stream) {
+                            Err(err) => return Err(err),
+                            Ok((result, new_byte_stream)) => {
+                                byte_stream = new_byte_stream;
+                                result
+                            }
+                        };
+
+                    }
+                });
+
+                let field_constructors = fields.unnamed.iter().enumerate().map(|(i, f)| {
+                    let field_name = Ident::new(&format!("field{}", i), Span::call_site());
+
+                    quote_spanned! {f.span()=>
+                        #field_name
+                    }
+                });
+
+                quote! {
+                    #(#declare_fields)*
+
+                    return Ok((
+                        #name (
+                            #(#field_constructors),*
+                        ),
+                        byte_stream
+                    ));
+
+                }
+            }
+            Fields::Unit => {
+                quote!(
+                    return Ok((
+                        #name,
+                        byte_stream
+                    ));
+                )
+            }
+        },
+        Data::Enum(ref data) => {
+            let parsed_data = data.variants.iter().enumerate().filter_map(|(variant_index, variant)|
+                match variant.fields {
+                    Fields::Named(ref fields) => {
+                        let mut field_types = fields.named.iter().map(|f| &f.ty);
+                        let constructor_name =
+                            Ident::new(&format!("constructor{}", variant_index), Span::call_site());
+
+                        Some(if field_types.len() == 1 {
+                            let only_field = field_types.next().unwrap();
+
+                            quote! {
+                                let #constructor_name =
+                                    match Option::<#only_field>::construct_from_emoji(byte_stream) {
+                                        Err(err) => return Err(err),
+                                        Ok((x, new_byte_stream)) => {
+                                            byte_stream = new_byte_stream;
+                                            x
+                                        }
+                                    };
+                            }
+                        } else {
+                            quote! {
+                                let #constructor_name =
+                                    match Option::<(#(#field_types),*)>::construct_from_emoji(byte_stream) {
+                                        Err(err) => return Err(err),
+                                        Ok((x, new_byte_stream)) => {
+                                            byte_stream = new_byte_stream;
+                                            x
+                                        }
+                                    };
+                            }
+                        })
+                    }
+                    Fields::Unnamed(ref fields) => {
+                        let mut field_types = fields.unnamed.iter().map(|f| &f.ty);
+                        let constructor_name =
+                            Ident::new(&format!("constructor{}", variant_index), Span::call_site());
+
+                        Some(if field_types.len() == 1 {
+                            let only_field = field_types.next().unwrap();
+
+                            quote! {
+                                let #constructor_name =
+                                    match Option::<#only_field>::construct_from_emoji(byte_stream) {
+                                        Err(err) => return Err(err),
+                                        Ok((x, new_byte_stream)) => {
+                                            byte_stream = new_byte_stream;
+                                            x
+                                        }
+                                    };
+                            }
+                        } else {
+                            quote! {
+                                let #constructor_name =
+                                    match Option::<(#(#field_types),*)>::construct_from_emoji(byte_stream) {
+                                        Err(err) => return Err(err),
+                                        Ok((x, new_byte_stream)) => {
+                                            byte_stream = new_byte_stream;
+                                            x
+                                        }
+                                    };
+                            }
+                        })
+                    }
+                    Fields::Unit => None,
+                },
+            );
+
+            let constructors = data
+                .variants
+                .iter()
+                .enumerate()
+                .map(|(variant_index, variant)| {
+                    let variant_name = &variant.ident;
+
+                    match variant.fields {
+                        Fields::Named(ref fields) => {
+                            let field_names = fields.named.iter().map(|f| &f.ident);
+                            let index = variant_index as u8;
+
+                            let pattern_matching_data =
+                                data
+                                    .variants
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    })
+                                    .map(|(i, _)| {
+                                        if i as u8 == variant_index as u8 {
+                                            let field_names2 = fields.named.iter().map(|f| &f.ident);
+
+                                            quote! {
+                                                Some((#(#field_names2),*))
+                                            }
+                                        } else {
+                                            quote! {None}
+                                        }
+                                    });
+
+
+                            quote! {
+                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name{#(#field_names),*}, byte_stream))
+                            }
+                        }
+                        Fields::Unnamed(ref fields) => {
+                            let field_names = fields.unnamed.iter().enumerate().map(|(field_index, _)| { Ident::new(&format!("x{}", field_index), Span::call_site()) });
+                            let index = variant_index as u8;
+
+                            let pattern_matching_data =
+                                data
+                                    .variants
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    })
+                                    .map(|(i, _)| {
+                                        if i as u8 == variant_index as u8 {
+                                            let field_names2 = fields.unnamed.iter().enumerate().map(|(field_index, _)| { Ident::new(&format!("x{}", field_index), Span::call_site()) });
+
+                                            quote! {
+                                                Some((#(#field_names2),*))
+                                            }
+                                        } else {
+                                            quote! {None}
+                                        }
+                                    });
+
+
+                            quote! {
+                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name(#(#field_names),*), byte_stream))
+                            }
+                        }
+                        Fields::Unit => {
+                            let index = variant_index as u8;
+
+                            let pattern_matching_data =
+                                data
+                                    .variants
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, v)| match v.fields {
+                                        Fields::Unit => false,
+                                        _ => true,
+                                    })
+                                    .map(|_| { quote! {None} });
+
+                            quote! {
+                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name, byte_stream))
+                            }
+                        }
+                    }
+                });
+
+            let parsed_data_variable_names = data.variants.iter().enumerate().filter_map(
+                |(variant_index, variant)| match variant.fields {
+                    Fields::Named(_) | Fields::Unnamed(_) => Some(Ident::new(
+                        &format!("constructor{}", variant_index),
+                        Span::call_site(),
+                    )),
+                    Fields::Unit => None,
+                },
+            );
+
+            quote! {
+                let constructor_discriminator =
+                    match u8::construct_from_emoji(byte_stream) {
+                        Err(err) => return Err(err),
+                        Ok((n, new_byte_stream)) => {
+                            byte_stream = new_byte_stream;
+                            n
+                        }
+                    };
+
+                #(#parsed_data)*
+
+                match (constructor_discriminator #(, #parsed_data_variable_names)*) {
+                    #(#constructors),*,
+                    _ => Err(FromEmojiError::UnexpectedInput("Constructor choice and data don't agree when demojfuscating #name".to_string()))
+                }
+            }
+        }
+        Data::Union(_) => unimplemented!(),
+    };
 
     // <I, ...> where ... are any generics from the type implementing ConstructFromEmoji
     let generics = input
@@ -555,92 +839,4 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
     };
 
     return proc_macro::TokenStream::from(expanded);
-}
-
-fn demojfuscate_fields(data: &Data, type_name: &Ident) -> TokenStream {
-    match *data {
-        Data::Struct(ref data) => match data.fields {
-            Fields::Named(ref fields) => {
-                let declare_fields = fields.named.iter().map(|f| {
-                    let name = &f.ident;
-                    let field_type = &f.ty;
-                    quote_spanned! {f.span()=>
-                        let #name = match #field_type::construct_from_emoji(byte_stream) {
-                            Err(err) => return Err(err),
-                            Ok((result, new_byte_stream)) => {
-                                byte_stream = new_byte_stream;
-                                result
-                            }
-                        };
-
-                    }
-                });
-
-                let field_constructors = fields.named.iter().map(|f| {
-                    let name = &f.ident;
-
-                    quote_spanned! {f.span()=>
-                        #name: #name,
-                    }
-                });
-
-                quote! {
-                    #(#declare_fields)*
-
-                    return Ok((
-                        #type_name {
-                            #(#field_constructors)*
-                        },
-                        byte_stream
-                    ));
-                }
-            }
-            Fields::Unnamed(ref fields) => {
-                let declare_fields = fields.unnamed.iter().enumerate().map(|(i, f)| {
-                    let name = Ident::new(&format!("field{}", i), Span::call_site());
-                    let field_type = &f.ty;
-                    quote_spanned! {f.span()=>
-                        let #name = match #field_type::construct_from_emoji(byte_stream) {
-                            Err(err) => return Err(err),
-                            Ok((result, new_byte_stream)) => {
-                                byte_stream = new_byte_stream;
-                                result
-                            }
-                        };
-
-                    }
-                });
-
-                let field_constructors = fields.unnamed.iter().enumerate().map(|(i, f)| {
-                    let name = Ident::new(&format!("field{}", i), Span::call_site());
-
-                    quote_spanned! {f.span()=>
-                        #name
-                    }
-                });
-
-                quote! {
-                    #(#declare_fields)*
-
-                    return Ok((
-                        #type_name (
-                            #(#field_constructors),*
-                        ),
-                        byte_stream
-                    ));
-
-                }
-            }
-            Fields::Unit => {
-                quote!(
-                    return Ok((
-                        #type_name,
-                        byte_stream
-                    ));
-                )
-            }
-        },
-        Data::Enum(_) => unimplemented!(),
-        Data::Union(_) => unimplemented!(),
-    }
 }
