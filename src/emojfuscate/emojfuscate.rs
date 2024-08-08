@@ -418,3 +418,83 @@ where
             .chain_emoji_bytes(c.emojfuscate_stream());
     }
 }
+
+impl<A1, A2, A3, A4, I1, I2, I3, I4> Emojfuscate<Chain<Chain<Chain<I1, I2>, I3>, I4>>
+    for (A1, A2, A3, A4)
+where
+    A1: Emojfuscate<I1>,
+    A2: Emojfuscate<I2>,
+    A3: Emojfuscate<I3>,
+    A4: Emojfuscate<I4>,
+    I1: Iterator<Item = ByteOrBreak>,
+    I2: Iterator<Item = ByteOrBreak>,
+    I3: Iterator<Item = ByteOrBreak>,
+    I4: Iterator<Item = ByteOrBreak>,
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Chain<I1, I2>, I3>, I4>> {
+        let (a1, a2, a3, a4) = self;
+        return a1
+            .emojfuscate_stream()
+            .chain_emoji_bytes(a2.emojfuscate_stream())
+            .chain_emoji_bytes(a3.emojfuscate_stream())
+            .chain_emoji_bytes(a4.emojfuscate_stream());
+    }
+}
+
+impl<A1, A2, A3, A4, A5, I1, I2, I3, I4, I5>
+    Emojfuscate<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>> for (A1, A2, A3, A4, A5)
+where
+    A1: Emojfuscate<I1>,
+    A2: Emojfuscate<I2>,
+    A3: Emojfuscate<I3>,
+    A4: Emojfuscate<I4>,
+    A5: Emojfuscate<I5>,
+    I1: Iterator<Item = ByteOrBreak>,
+    I2: Iterator<Item = ByteOrBreak>,
+    I3: Iterator<Item = ByteOrBreak>,
+    I4: Iterator<Item = ByteOrBreak>,
+    I5: Iterator<Item = ByteOrBreak>,
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>> {
+        let (a1, a2, a3, a4, a5) = self;
+        return a1
+            .emojfuscate_stream()
+            .chain_emoji_bytes(a2.emojfuscate_stream())
+            .chain_emoji_bytes(a3.emojfuscate_stream())
+            .chain_emoji_bytes(a4.emojfuscate_stream())
+            .chain_emoji_bytes(a5.emojfuscate_stream());
+    }
+}
+
+impl<A1, A2, A3, A4, A5, A6, I1, I2, I3, I4, I5, I6>
+    Emojfuscate<Chain<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>, I6>>
+    for (A1, A2, A3, A4, A5, A6)
+where
+    A1: Emojfuscate<I1>,
+    A2: Emojfuscate<I2>,
+    A3: Emojfuscate<I3>,
+    A4: Emojfuscate<I4>,
+    A5: Emojfuscate<I5>,
+    A6: Emojfuscate<I6>,
+    I1: Iterator<Item = ByteOrBreak>,
+    I2: Iterator<Item = ByteOrBreak>,
+    I3: Iterator<Item = ByteOrBreak>,
+    I4: Iterator<Item = ByteOrBreak>,
+    I5: Iterator<Item = ByteOrBreak>,
+    I6: Iterator<Item = ByteOrBreak>,
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>, I6>> {
+        let (a1, a2, a3, a4, a5, a6) = self;
+        return a1
+            .emojfuscate_stream()
+            .chain_emoji_bytes(a2.emojfuscate_stream())
+            .chain_emoji_bytes(a3.emojfuscate_stream())
+            .chain_emoji_bytes(a4.emojfuscate_stream())
+            .chain_emoji_bytes(a5.emojfuscate_stream())
+            .chain_emoji_bytes(a6.emojfuscate_stream());
+    }
+}

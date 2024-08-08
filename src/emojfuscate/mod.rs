@@ -187,6 +187,30 @@ mod tests {
         }
 
         #[test]
+        fn emojfuscate_tuple_4(b1 : bool, b2 : bool, b3 : bool, b4 : bool) {
+            let original_message = (b1, b2, b3, b4);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_tuple_5(b1 : bool, b2 : bool, b3 : bool, b4 : bool, b5 : bool) {
+            let original_message = (b1, b2, b3, b4, b5);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_tuple_6(b1 : bool, b2 : bool, b3 : bool, b4 : bool, b5 : bool, b6 : bool) {
+            let original_message = (b1, b2, b3, b4, b5, b6);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
         fn emojfuscate_u8_vec(original_message : Vec<u8>) {
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();

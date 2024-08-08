@@ -1,4 +1,5 @@
 use arrayvec::ArrayVec;
+use paste::paste;
 use std::collections::HashMap;
 use std::str;
 use uuid::Uuid;
@@ -533,54 +534,102 @@ where
     }
 }
 
-impl<I, A, B> ConstructFromEmoji<(A, B), I> for (A, B)
-where
-    I: Iterator<Item = u8>,
-    A: ConstructFromEmoji<A, I>,
-    B: ConstructFromEmoji<B, I>,
-{
-    fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<((A, B), DecodeEmojiToBytes<I>), FromEmojiError> {
-        let (first, byte_stream_after_1) = match A::construct_from_emoji(byte_stream) {
-            Err(err) => return Err(err),
-            Ok(result) => result,
-        };
+macro_rules! tuple_impls {
+    ( $( $name:ident )+ ) => {
+        paste! {
+            impl<Iter, $($name),+> ConstructFromEmoji<($($name),+), Iter> for ($($name),+)
+            where
+                Iter: Iterator<Item = u8>,
+                $($name: ConstructFromEmoji<$name, Iter>
+                ),+
+            {
+                fn construct_from_emoji(
+                    mut byte_stream: DecodeEmojiToBytes<Iter>,
+                ) -> Result<(($($name),+), DecodeEmojiToBytes<Iter>), FromEmojiError> {
+                    $(
+                    let [<$name:lower>] = match $name::construct_from_emoji(byte_stream) {
+                        Err(err) => return Err(err),
+                        Ok((result, new_byte_stream)) => {
+                            byte_stream = new_byte_stream;
+                            result
+                        }
+                    };
 
-        let (second, byte_stream_after_2) = match B::construct_from_emoji(byte_stream_after_1) {
-            Err(err) => return Err(err),
-            Ok(result) => result,
-        };
+                    )+
 
-        return Ok(((first, second), byte_stream_after_2));
+                    return Ok((($([<$name:lower>]),+), byte_stream));
+                }
+            }
+        }
     }
 }
 
-impl<I, A, B, C> ConstructFromEmoji<(A, B, C), I> for (A, B, C)
+/*
+tuples of 24 elements should be plenty, I can't be bothered to go beyond the letters of the
+alphabet as variable names.
+
+The generated code should look something like this:
+
+impl<Iter, A, B, C> ConstructFromEmoji<(A, B, C), Iter> for (A, B, C)
 where
-    I: Iterator<Item = u8>,
-    A: ConstructFromEmoji<A, I>,
-    B: ConstructFromEmoji<B, I>,
-    C: ConstructFromEmoji<C, I>,
+    Iter: Iterator<Item = u8>,
+    A: ConstructFromEmoji<A, Iter>,
+    B: ConstructFromEmoji<B, Iter>,
+    C: ConstructFromEmoji<C, Iter>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<((A, B, C), DecodeEmojiToBytes<I>), FromEmojiError> {
-        let (first, byte_stream_after_1) = match A::construct_from_emoji(byte_stream) {
+        mut byte_stream: DecodeEmojiToBytes<Iter>,
+    ) -> Result<((A, B, C), DecodeEmojiToBytes<Iter>), FromEmojiError> {
+        let a = match A::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok(result) => result,
+            Ok((result, new_byte_stream)) => {
+                byte_stream = new_byte_stream;
+                result
+            }
         };
 
-        let (second, byte_stream_after_2) = match B::construct_from_emoji(byte_stream_after_1) {
+        let b = match B::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok(result) => result,
+            Ok((result, new_byte_stream)) => {
+                byte_stream = new_byte_stream;
+                result
+            }
         };
 
-        let (third, byte_stream_after_3) = match C::construct_from_emoji(byte_stream_after_2) {
+        let c = match C::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok(result) => result,
+            Ok((result, new_byte_stream)) => {
+                byte_stream = new_byte_stream;
+                result
+            }
         };
 
-        return Ok(((first, second, third), byte_stream_after_3));
+        return Ok(((a, b, c), byte_stream));
     }
 }
+*/
+tuple_impls! { A B }
+tuple_impls! { A B C }
+tuple_impls! { A B C D }
+tuple_impls! { A B C D E }
+tuple_impls! { A B C D E F }
+tuple_impls! { A B C D E F G }
+tuple_impls! { A B C D E F G H }
+tuple_impls! { A B C D E F G H I }
+tuple_impls! { A B C D E F G H I J }
+tuple_impls! { A B C D E F G H I J K }
+tuple_impls! { A B C D E F G H I J K L }
+tuple_impls! { A B C D E F G H I J K L M }
+tuple_impls! { A B C D E F G H I J K L M N }
+tuple_impls! { A B C D E F G H I J K L M N O }
+tuple_impls! { A B C D E F G H I J K L M N O P }
+tuple_impls! { A B C D E F G H I J K L M N O P Q }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y }
+tuple_impls! { A B C D E F G H I J K L M N O P Q R S T U V W X Y Z }
