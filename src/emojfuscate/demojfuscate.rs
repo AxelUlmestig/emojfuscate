@@ -52,7 +52,6 @@ where
     defined_bits: u32,
     accumulated_input_bytes: Vec<u8>,
     bits_to_truncate: u32,
-    emoji_values: HashMap<char, u32>,
 }
 
 impl<I> DecodeEmojiToBytes<I>
@@ -66,9 +65,6 @@ where
             defined_bits: 0,
             accumulated_input_bytes: Vec::new(),
             bits_to_truncate: 0,
-            emoji_values: HashMap::from_iter(constants::EMOJI.iter().enumerate().map(
-                |(i, unicode)| (char::from_u32(*unicode).unwrap(), u32::try_from(i).unwrap()),
-            )),
         }
     }
 }
@@ -112,7 +108,7 @@ where
             // delete the accumulated bytes
             self.accumulated_input_bytes.truncate(0);
 
-            let emoji_value = match self.emoji_values.get(&emoji) {
+            let emoji_value = match constants::EMOJI_VALUES.get(&emoji) {
                 Some(x) => x,
                 None => panic!("Unexpected input character: {}", emoji),
             };
