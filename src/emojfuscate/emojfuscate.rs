@@ -26,7 +26,7 @@ where
 {
     iter: I,
     input_data: usize,
-    defined_bits: u32,
+    defined_bits: u16,
     queued_emoji: VecDeque<char>,
 }
 

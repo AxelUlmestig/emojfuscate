@@ -48,10 +48,10 @@ where
     I: Iterator<Item = u8>,
 {
     iter: I,
-    accumulated_data: u32,
-    defined_bits: u32,
+    accumulated_data: u16,
+    defined_bits: u16,
     accumulated_input_bytes: Vec<u8>,
-    bits_to_truncate: u32,
+    bits_to_truncate: u16,
 }
 
 impl<I> DecodeEmojiToBytes<I>
@@ -77,11 +77,11 @@ where
     fn next(&mut self) -> Option<u8> {
         loop {
             if self.defined_bits >= constants::BITS_IN_A_BYTE {
-                let u32_byte_to_output =
+                let u16_byte_to_output =
                     self.accumulated_data >> (self.defined_bits - constants::BITS_IN_A_BYTE);
                 self.accumulated_data = self.accumulated_data
-                    ^ (u32_byte_to_output << (self.defined_bits - constants::BITS_IN_A_BYTE));
-                let [byte_to_output, _, _, _] = u32_byte_to_output.to_ne_bytes();
+                    ^ (u16_byte_to_output << (self.defined_bits - constants::BITS_IN_A_BYTE));
+                let [byte_to_output, _] = u16_byte_to_output.to_ne_bytes();
                 self.defined_bits -= constants::BITS_IN_A_BYTE;
 
                 return Some(byte_to_output);

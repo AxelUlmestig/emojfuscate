@@ -1,10 +1,10 @@
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 
-pub const BITS_IN_A_BYTE: u32 = 8;
-pub const BITS_PER_EMOJI: u32 = 10;
-pub const MAX_EMOJI_VALUE: u32 = u32::pow(2, BITS_PER_EMOJI);
-pub const STOP_EMOJI_VALUE: u32 = MAX_EMOJI_VALUE + BITS_IN_A_BYTE + 1;
+pub const BITS_IN_A_BYTE: u16 = 8;
+pub const BITS_PER_EMOJI: u16 = 10;
+pub const MAX_EMOJI_VALUE: u16 = u16::pow(2, BITS_PER_EMOJI as u32);
+pub const STOP_EMOJI_VALUE: u16 = MAX_EMOJI_VALUE + BITS_IN_A_BYTE + 1;
 
 // This code isn't dead at all, I'm not sure why Rust is complaining about it
 #[allow(dead_code)]
@@ -13,13 +13,13 @@ pub fn usize_to_emoji(u: usize) -> char {
     return char::from_u32(emoji_unicode).unwrap();
 }
 
-const EMOJI_VALUE_TUPLES: [(char, u32); 1385] = {
+const EMOJI_VALUE_TUPLES: [(char, u16); 1385] = {
     let mut emoji_value_pairs = [('a', 0); 1385];
     let mut index = 0;
 
     while index < EMOJI.len() {
         emoji_value_pairs[index] = match char::from_u32(EMOJI[index]) {
-            Some(c) => (c, index as u32),
+            Some(c) => (c, index as u16),
             None => panic!("unexpected unicode"),
         };
 
@@ -30,7 +30,7 @@ const EMOJI_VALUE_TUPLES: [(char, u32); 1385] = {
 };
 
 lazy_static! {
-    pub static ref EMOJI_VALUES: HashMap<char, u32> = HashMap::from(EMOJI_VALUE_TUPLES);
+    pub static ref EMOJI_VALUES: HashMap<char, u16> = HashMap::from(EMOJI_VALUE_TUPLES);
 }
 
 pub const EMOJI: [u32; 1385] = [
