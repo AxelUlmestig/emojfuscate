@@ -1,6 +1,5 @@
 use arrayvec::ArrayVec;
 use paste::paste;
-use std::collections::HashMap;
 use std::str;
 use uuid::Uuid;
 

@@ -8,9 +8,8 @@ use std::process::ExitCode;
 use std::str;
 use uuid::Uuid;
 
-use emojfuscate::demojfuscate::{ConstructFromEmojiStream, Demojfuscate, FromEmojiError};
-use emojfuscate::emojfuscate::Emojfuscate;
 use emojfuscate::hex_stream::HexStream;
+use emojfuscate::{ConstructFromEmojiStream, Demojfuscate, Emojfuscate, FromEmojiError};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
