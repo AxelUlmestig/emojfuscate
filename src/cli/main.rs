@@ -129,7 +129,7 @@ fn main() -> ExitCode {
                     }
                 }
                 some_string => {
-                    for byte in some_string.bytes().demojfuscate_stream() {
+                    for byte in some_string.demojfuscate_stream() {
                         stream.write(&[byte]).unwrap();
                     }
                 }

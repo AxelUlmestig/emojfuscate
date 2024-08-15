@@ -244,6 +244,20 @@ impl Emojfuscate<IntoIter<ByteOrBreak, 8>> for f64 {
     }
 }
 
+impl<'a> Emojfuscate<Chain<Map<std::str::Bytes<'a>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>>
+    for &'a str
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Map<std::str::Bytes<'a>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>>
+    {
+        self.bytes()
+            .into_iter()
+            .emojfuscate_stream()
+            .add_stop_emoji()
+    }
+}
+
 impl Emojfuscate<Chain<Map<std::vec::IntoIter<u8>, fn(u8) -> ByteOrBreak>, Once<ByteOrBreak>>>
     for String
 {

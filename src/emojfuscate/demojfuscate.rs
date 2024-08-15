@@ -167,6 +167,12 @@ impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String {
     }
 }
 
+impl<'a> ConstructFromEmojiStream<core::str::Bytes<'a>> for &'a str {
+    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
+        self.bytes().into_iter().demojfuscate_stream()
+    }
+}
+
 /*
 impl<I> ConstructFromEmoji<DecodeEmojiToBytes<I>, I> for DecodeEmojiToBytes<I>
 where
