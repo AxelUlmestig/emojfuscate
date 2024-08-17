@@ -4,7 +4,7 @@ use std::collections::HashMap;
 pub const BITS_IN_A_BYTE: u16 = 8;
 pub const BITS_PER_EMOJI: u16 = 10;
 pub const MAX_EMOJI_VALUE: u16 = u16::pow(2, BITS_PER_EMOJI as u32);
-pub const STOP_EMOJI_VALUE: u16 = MAX_EMOJI_VALUE + BITS_IN_A_BYTE + 1;
+pub const STOP_EMOJI_VALUE: u16 = MAX_EMOJI_VALUE + BITS_PER_EMOJI + 1;
 
 // This code isn't dead at all, I'm not sure why Rust is complaining about it
 #[allow(dead_code)]
