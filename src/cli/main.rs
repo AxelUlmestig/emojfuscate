@@ -19,14 +19,20 @@ struct Cli {
     command: Commands,
     #[arg(short, long)]
     line_break: bool,
-    // #[clap(value_enum, default_value_t=DataType::Text)]
-    // data_type: DataType
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    Encode { data_type: DataType, input: String },
-    Decode { data_type: DataType, input: String },
+    Encode {
+        input: String,
+        #[arg(short, long, default_value_t = DataType::Text)]
+        data_type: DataType,
+    },
+    Decode {
+        input: String,
+        #[arg(short, long, default_value_t = DataType::Text)]
+        data_type: DataType,
+    },
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -34,6 +40,17 @@ enum DataType {
     Text,
     UUID,
     Hexadecimal,
+}
+
+impl std::fmt::Display for DataType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let stringified = match self {
+            DataType::Text => "text",
+            DataType::UUID => "uuid",
+            DataType::Hexadecimal => "hexadecimal",
+        };
+        write!(f, "{}", stringified)
+    }
 }
 
 fn main() -> ExitCode {
