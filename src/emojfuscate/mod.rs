@@ -1,7 +1,6 @@
 mod constants;
 mod demojfuscate;
 mod emojfuscate;
-pub mod hex_stream;
 
 pub use demojfuscate::{
     ConstructFromEmoji, DecodeEmojiToBytes, Demojfuscate, FromEmojiError, IsEmojiRepresentation,

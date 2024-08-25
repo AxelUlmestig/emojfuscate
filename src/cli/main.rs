@@ -8,8 +8,8 @@ use std::process::ExitCode;
 use std::str;
 use uuid::Uuid;
 
-use emojfuscate::hex_stream::HexStream;
 use emojfuscate::{Demojfuscate, Emojfuscate, FromEmojiError, IsEmojiRepresentation};
+mod hex_stream;
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
@@ -84,12 +84,16 @@ fn main() -> ExitCode {
                 }
                 DataType::Hexadecimal => match input.as_str() {
                     "-" => {
-                        for emoji in HexStream::new(unwrapped_std_in).emojfuscate_stream() {
+                        for emoji in
+                            hex_stream::HexStream::new(unwrapped_std_in).emojfuscate_stream()
+                        {
                             stream.write(emoji.to_string().as_bytes()).unwrap();
                         }
                     }
                     some_string => {
-                        for emoji in HexStream::new(some_string.bytes()).emojfuscate_stream() {
+                        for emoji in
+                            hex_stream::HexStream::new(some_string.bytes()).emojfuscate_stream()
+                        {
                             stream.write(emoji.to_string().as_bytes()).unwrap();
                         }
                     }
