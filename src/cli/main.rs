@@ -9,7 +9,7 @@ use std::str;
 use uuid::Uuid;
 
 use emojfuscate::hex_stream::HexStream;
-use emojfuscate::{ConstructFromEmojiStream, Demojfuscate, Emojfuscate, FromEmojiError};
+use emojfuscate::{Demojfuscate, Emojfuscate, FromEmojiError, IsEmojiRepresentation};
 
 #[derive(Parser)]
 #[command(version, about, long_about = None)]

@@ -9,7 +9,7 @@ mod constants;
 // fundamental traits
 pub trait Demojfuscate<A, I>
 where
-    Self: ConstructFromEmojiStream<I>,
+    Self: IsEmojiRepresentation<I>,
     A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>,
 {
@@ -18,7 +18,7 @@ where
         Self: Sized;
 }
 
-pub trait ConstructFromEmojiStream<I>
+pub trait IsEmojiRepresentation<I>
 where
     I: Iterator<Item = u8>,
 {
@@ -140,7 +140,7 @@ where
 
 impl<A, B, I> Demojfuscate<B, I> for A
 where
-    Self: ConstructFromEmojiStream<I>,
+    Self: IsEmojiRepresentation<I>,
     B: ConstructFromEmoji<B, I>,
     I: Iterator<Item = u8>,
 {
@@ -155,19 +155,19 @@ where
     }
 }
 
-impl<I: Iterator<Item = u8>> ConstructFromEmojiStream<I> for I {
+impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
     fn demojfuscate_stream(self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
     }
 }
 
-impl ConstructFromEmojiStream<std::vec::IntoIter<u8>> for String {
+impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
     fn demojfuscate_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
         self.into_bytes().into_iter().demojfuscate_stream()
     }
 }
 
-impl<'a> ConstructFromEmojiStream<core::str::Bytes<'a>> for &'a str {
+impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
     fn demojfuscate_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
         self.bytes().into_iter().demojfuscate_stream()
     }
