@@ -49,7 +49,6 @@ where
     iter: I,
     accumulated_data: u16,
     defined_bits: u16,
-    accumulated_input_bytes: Vec<u8>,
     bits_to_truncate: u16,
 }
 
@@ -62,7 +61,6 @@ where
             iter,
             accumulated_data: 0,
             defined_bits: 0,
-            accumulated_input_bytes: Vec::new(),
             bits_to_truncate: 0,
         }
     }
@@ -86,26 +84,37 @@ where
                 return Some(byte_to_output);
             }
 
-            let mb = self.iter.next();
-            let Some(b) = mb else { return None };
+            let emoji = {
+                let Some(b) = self.iter.next() else {
+                    return None;
+                };
 
-            self.accumulated_input_bytes.push(b);
+                // The first bits of the first byte signify how long (in bytes) the UTF-8 character is.
+                // 0b10XXXXXX means a one byte character. 0b110XXXXX means a two byte character and so
+                // on up to four bytes.
+                let remaining_bytes_in_char = match b & 0b11110000 {
+                    0b10000000 => 0,
+                    0b11000000 => 1,
+                    0b11100000 => 2,
+                    0b11110000 => 3,
+                    _ => panic!("Invalid start of UTF-8 byte"),
+                };
 
-            if self.accumulated_input_bytes.len() < 3 {
-                continue;
-            }
+                let mut input_bytes = vec![b];
+                let mut bytes_after_first: Vec<u8> =
+                    self.iter.by_ref().take(remaining_bytes_in_char).collect();
 
-            if self.accumulated_input_bytes.len() > 5 {
-                panic!("accumulated_input_bytes.len() > 5");
-            }
+                if bytes_after_first.len() != remaining_bytes_in_char {
+                    panic!("Input stream ended prematurely, expected more bytes in UTF-8 char");
+                }
 
-            let emoji = match str::from_utf8(&self.accumulated_input_bytes) {
-                Ok(s) => s.chars().nth(0).unwrap(),
-                Err(_) => continue,
+                input_bytes.append(&mut bytes_after_first);
+
+                match str::from_utf8(&input_bytes) {
+                    Ok(s) => s.chars().nth(0).unwrap(),
+                    Err(_) => panic!("Failed to parse UTF-8 character"),
+                }
             };
-
-            // delete the accumulated bytes
-            self.accumulated_input_bytes.truncate(0);
 
             let emoji_value = match constants::EMOJI_VALUES.get(&emoji) {
                 Some(x) => x,
@@ -122,7 +131,6 @@ where
             // happens at the end of the encoded message
             if *emoji_value >= constants::MAX_EMOJI_VALUE {
                 self.bits_to_truncate = *emoji_value - constants::MAX_EMOJI_VALUE;
-                //println!("emoji: {}, bits_to_truncate: {}", emoji, bits_to_truncate);
                 continue;
             }
 

@@ -1,3 +1,4 @@
 target/
 src/emojfuscate/mod.proptest-regressions
 .direnv/
+tests/tests.proptest-regressions
