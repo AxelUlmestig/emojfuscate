@@ -146,29 +146,41 @@ fn main() -> ExitCode {
                             eprintln!("{}", error_message);
                             return ExitCode::FAILURE;
                         }
+                        Err(FromEmojiError::InvalidUtf8) => {
+                            eprintln!("The input bytes are not valid UTF-8");
+                            return ExitCode::FAILURE;
+                        }
+                        Err(FromEmojiError::InputIsNotAnEmoji(error_message)) => {
+                            eprintln!("{}", error_message);
+                            return ExitCode::FAILURE;
+                        }
                     }
                 }
                 DataType::Hexadecimal => match input.as_str() {
                     "-" => {
                         for byte in unwrapped_std_in.demojfuscate_stream() {
-                            stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
+                            stream
+                                .write(hex::encode(&[byte.unwrap()]).as_bytes())
+                                .unwrap();
                         }
                     }
                     some_string => {
                         for byte in some_string.bytes().demojfuscate_stream() {
-                            stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
+                            stream
+                                .write(hex::encode(&[byte.unwrap()]).as_bytes())
+                                .unwrap();
                         }
                     }
                 },
                 DataType::Text => match input.as_str() {
                     "-" => {
                         for byte in unwrapped_std_in.demojfuscate_stream() {
-                            stream.write(&[byte]).unwrap();
+                            stream.write(&[byte.unwrap()]).unwrap();
                         }
                     }
                     some_string => {
                         for byte in some_string.demojfuscate_stream() {
-                            stream.write(&[byte]).unwrap();
+                            stream.write(&[byte.unwrap()]).unwrap();
                         }
                     }
                 },

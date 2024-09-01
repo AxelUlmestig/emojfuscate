@@ -38,6 +38,8 @@ where
 
 #[derive(Debug, PartialEq)]
 pub enum FromEmojiError {
+    InvalidUtf8,
+    InputIsNotAnEmoji(String),
     NotEnoughEmoji,
     UnexpectedInput(String),
 }
@@ -70,8 +72,8 @@ impl<I> Iterator for DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>,
 {
-    type Item = u8;
-    fn next(&mut self) -> Option<u8> {
+    type Item = Result<u8, FromEmojiError>;
+    fn next(&mut self) -> Option<Result<u8, FromEmojiError>> {
         loop {
             if self.defined_bits >= constants::BITS_IN_A_BYTE {
                 let u16_byte_to_output =
@@ -81,7 +83,7 @@ where
                 let [byte_to_output, _] = u16_byte_to_output.to_ne_bytes();
                 self.defined_bits -= constants::BITS_IN_A_BYTE;
 
-                return Some(byte_to_output);
+                return Some(Ok(byte_to_output));
             }
 
             let emoji = {
@@ -97,7 +99,7 @@ where
                     0b11000000 => 1,
                     0b11100000 => 2,
                     0b11110000 => 3,
-                    _ => panic!("Invalid start of UTF-8 byte"),
+                    _ => return Some(Err(FromEmojiError::InvalidUtf8)),
                 };
 
                 let mut input_bytes = vec![b];
@@ -105,20 +107,25 @@ where
                     self.iter.by_ref().take(remaining_bytes_in_char).collect();
 
                 if bytes_after_first.len() != remaining_bytes_in_char {
-                    panic!("Input stream ended prematurely, expected more bytes in UTF-8 char");
+                    return Some(Err(FromEmojiError::InvalidUtf8));
                 }
 
                 input_bytes.append(&mut bytes_after_first);
 
                 match str::from_utf8(&input_bytes) {
                     Ok(s) => s.chars().nth(0).unwrap(),
-                    Err(_) => panic!("Failed to parse UTF-8 character"),
+                    Err(_) => return Some(Err(FromEmojiError::InvalidUtf8)),
                 }
             };
 
             let emoji_value = match constants::EMOJI_VALUES.get(&emoji) {
                 Some(x) => x,
-                None => panic!("Unexpected input character: {}", emoji),
+                None => {
+                    return Some(Err(FromEmojiError::InputIsNotAnEmoji(format!(
+                        "Unexpected input character: {}",
+                        emoji
+                    ))))
+                }
             };
 
             // the stop emoji is used by types whose type is unknown at compile time (e.g. strings)
@@ -212,9 +219,10 @@ where
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(bool, DecodeEmojiToBytes<I>), FromEmojiError> {
         match byte_stream.next() {
-            Some(0) => Ok((false, byte_stream)),
-            Some(1) => Ok((true, byte_stream)),
-            Some(x) => Err(FromEmojiError::UnexpectedInput(format!("Received unexpected byte when trying to demojfuscate bool, expected 0 or 1 but received {}", x))),
+            Some(Ok(0)) => Ok((false, byte_stream)),
+            Some(Ok(1)) => Ok((true, byte_stream)),
+            Some(Ok(x)) => Err(FromEmojiError::UnexpectedInput(format!("Received unexpected byte when trying to demojfuscate bool, expected 0 or 1 but received {}", x))),
+            Some(Err(err)) => Err(err),
             None => Err(FromEmojiError::NotEnoughEmoji)
         }
     }
@@ -248,7 +256,8 @@ where
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(u8, DecodeEmojiToBytes<I>), FromEmojiError> {
         match byte_stream.next() {
-            Some(byte) => Ok((byte, byte_stream)),
+            Some(Ok(byte)) => Ok((byte, byte_stream)),
+            Some(Err(err)) => Err(err),
             None => Err(FromEmojiError::NotEnoughEmoji),
         }
     }
@@ -405,10 +414,23 @@ where
     fn construct_from_emoji(
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(String, DecodeEmojiToBytes<I>), FromEmojiError> {
-        Ok((
-            String::from_utf8(byte_stream.by_ref().collect::<Vec<u8>>()).unwrap(),
-            byte_stream,
-        ))
+        let byte_vec_or_err: Result<Vec<u8>, FromEmojiError> = byte_stream.by_ref().collect();
+
+        let byte_vec = match byte_vec_or_err {
+            Err(err) => return Err(err),
+            Ok(byte_vec) => byte_vec,
+        };
+
+        let string = match String::from_utf8(byte_vec) {
+            Err(_) => {
+                return Err(FromEmojiError::UnexpectedInput(
+                    "Failed to deserialize to UTF-8 string".to_string(),
+                ))
+            }
+            Ok(string) => string,
+        };
+
+        return Ok((string, byte_stream));
     }
 }
 
