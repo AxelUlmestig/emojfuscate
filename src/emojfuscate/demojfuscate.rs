@@ -3,8 +3,10 @@ use paste::paste;
 use std::str;
 use uuid::Uuid;
 
-#[path = "constants.rs"]
-mod constants;
+use super::constants::{
+    ByteInSequence, BITS_IN_A_BYTE, BITS_PER_EMOJI, EMOJI_VALUES, MAX_EMOJI_VALUE,
+    START_EMOJI_VALUE, STOP_EMOJI_VALUE,
+};
 
 // fundamental traits
 pub trait Demojfuscate<A, I>
@@ -42,6 +44,9 @@ pub enum FromEmojiError {
     InputIsNotAnEmoji(String),
     NotEnoughEmoji,
     UnexpectedInput(String),
+    MissingSequenceStart,
+    UnexpectedSequenceStart(String),
+    UnexpectedSequenceEnd,
 }
 
 pub struct DecodeEmojiToBytes<I>
@@ -68,22 +73,23 @@ where
     }
 }
 
+// implementations
 impl<I> Iterator for DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>,
 {
-    type Item = Result<u8, FromEmojiError>;
-    fn next(&mut self) -> Option<Result<u8, FromEmojiError>> {
+    type Item = Result<ByteInSequence, FromEmojiError>;
+    fn next(&mut self) -> Option<Result<ByteInSequence, FromEmojiError>> {
         loop {
-            if self.defined_bits >= constants::BITS_IN_A_BYTE {
+            if self.defined_bits >= BITS_IN_A_BYTE {
                 let u16_byte_to_output =
-                    self.accumulated_data >> (self.defined_bits - constants::BITS_IN_A_BYTE);
+                    self.accumulated_data >> (self.defined_bits - BITS_IN_A_BYTE);
                 self.accumulated_data = self.accumulated_data
-                    ^ (u16_byte_to_output << (self.defined_bits - constants::BITS_IN_A_BYTE));
+                    ^ (u16_byte_to_output << (self.defined_bits - BITS_IN_A_BYTE));
                 let [byte_to_output, _] = u16_byte_to_output.to_ne_bytes();
-                self.defined_bits -= constants::BITS_IN_A_BYTE;
+                self.defined_bits -= BITS_IN_A_BYTE;
 
-                return Some(Ok(byte_to_output));
+                return Some(Ok(ByteInSequence::Byte(byte_to_output)));
             }
 
             let emoji = {
@@ -118,7 +124,7 @@ where
                 }
             };
 
-            let emoji_value = match constants::EMOJI_VALUES.get(&emoji) {
+            let emoji_value = match EMOJI_VALUES.get(&emoji) {
                 Some(x) => x,
                 None => {
                     return Some(Err(FromEmojiError::InputIsNotAnEmoji(format!(
@@ -128,22 +134,25 @@ where
                 }
             };
 
-            // the stop emoji is used by types whose type is unknown at compile time (e.g. strings)
-            // to indicate that they're done
-            if *emoji_value == constants::STOP_EMOJI_VALUE {
-                return None;
+            // the start/stop emoji are used by types whose type is unknown at compile time (e.g.
+            // strings) to indicate beginning and end of data with dynamic length
+            if *emoji_value == START_EMOJI_VALUE {
+                return Some(Ok(ByteInSequence::SequenceStart));
+            }
+
+            if *emoji_value == STOP_EMOJI_VALUE {
+                return Some(Ok(ByteInSequence::SequenceEnd));
             }
 
             // emoji beyond 2047 are used to indicate that the next emoji produces too many bits. This
             // happens at the end of the encoded message
-            if *emoji_value >= constants::MAX_EMOJI_VALUE {
-                self.bits_to_truncate = *emoji_value - constants::MAX_EMOJI_VALUE;
+            if *emoji_value >= MAX_EMOJI_VALUE {
+                self.bits_to_truncate = *emoji_value - MAX_EMOJI_VALUE;
                 continue;
             }
 
-            self.accumulated_data =
-                (self.accumulated_data << constants::BITS_PER_EMOJI) | emoji_value;
-            self.defined_bits += constants::BITS_PER_EMOJI;
+            self.accumulated_data = (self.accumulated_data << BITS_PER_EMOJI) | emoji_value;
+            self.defined_bits += BITS_PER_EMOJI;
 
             // TODO: combine this with the above statement
             self.accumulated_data = self.accumulated_data >> self.bits_to_truncate;
@@ -219,9 +228,11 @@ where
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(bool, DecodeEmojiToBytes<I>), FromEmojiError> {
         match byte_stream.next() {
-            Some(Ok(0)) => Ok((false, byte_stream)),
-            Some(Ok(1)) => Ok((true, byte_stream)),
-            Some(Ok(x)) => Err(FromEmojiError::UnexpectedInput(format!("Received unexpected byte when trying to demojfuscate bool, expected 0 or 1 but received {}", x))),
+            Some(Ok(ByteInSequence::Byte(0))) => Ok((false, byte_stream)),
+            Some(Ok(ByteInSequence::Byte(1))) => Ok((true, byte_stream)),
+            Some(Ok(ByteInSequence::Byte(x))) => Err(FromEmojiError::UnexpectedInput(format!("Received unexpected byte when trying to demojfuscate bool, expected 0 or 1 but received {}", x))),
+            Some(Ok(ByteInSequence::SequenceStart)) => Err(FromEmojiError::UnexpectedSequenceStart("When demojfuscating bool".to_string())),
+            Some(Ok(ByteInSequence::SequenceEnd)) => Err(FromEmojiError::UnexpectedSequenceEnd),
             Some(Err(err)) => Err(err),
             None => Err(FromEmojiError::NotEnoughEmoji)
         }
@@ -256,7 +267,11 @@ where
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(u8, DecodeEmojiToBytes<I>), FromEmojiError> {
         match byte_stream.next() {
-            Some(Ok(byte)) => Ok((byte, byte_stream)),
+            Some(Ok(ByteInSequence::Byte(byte))) => Ok((byte, byte_stream)),
+            Some(Ok(ByteInSequence::SequenceStart)) => Err(
+                FromEmojiError::UnexpectedSequenceStart("When demojfuscating u8".to_string()),
+            ),
+            Some(Ok(ByteInSequence::SequenceEnd)) => Err(FromEmojiError::UnexpectedSequenceEnd),
             Some(Err(err)) => Err(err),
             None => Err(FromEmojiError::NotEnoughEmoji),
         }
@@ -414,7 +429,27 @@ where
     fn construct_from_emoji(
         mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(String, DecodeEmojiToBytes<I>), FromEmojiError> {
-        let byte_vec_or_err: Result<Vec<u8>, FromEmojiError> = byte_stream.by_ref().collect();
+        // verify that first item is SequenceStart
+        match byte_stream.next() {
+            Some(Ok(ByteInSequence::SequenceStart)) => {}
+            Some(Err(err)) => return Err(err),
+            _ => return Err(FromEmojiError::MissingSequenceStart),
+        };
+
+        // collect bytes until we hit SequenceEnd. The SequenceEnd element is dropped by map_while
+        let byte_vec_or_err: Result<Vec<u8>, FromEmojiError> = byte_stream
+            .by_ref()
+            .map_while(|pb| match pb {
+                Ok(ByteInSequence::Byte(b)) => Some(Ok(b)),
+                Ok(ByteInSequence::SequenceEnd) => None,
+                Ok(ByteInSequence::SequenceStart) => {
+                    Some(Err(FromEmojiError::UnexpectedSequenceStart(
+                        "When demojfuscating String".to_string(),
+                    )))
+                }
+                Err(err) => Some(Err(err)),
+            })
+            .collect();
 
         let byte_vec = match byte_vec_or_err {
             Err(err) => return Err(err),

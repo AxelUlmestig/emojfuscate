@@ -29,9 +29,9 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     u8: emojfuscate::Emojfuscate<I1>,
                     A: emojfuscate::Emojfuscate<I2>,
                     String: emojfuscate::Emojfuscate<I3>,
-                    I1: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I2: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I3: Iterator<Item = emojfuscate::ByteOrBreak>,
+                    I1: Iterator<Item = emojfuscate::ByteInSequence>,
+                    I2: Iterator<Item = emojfuscate::ByteInSequence>,
+                    I3: Iterator<Item = emojfuscate::ByteInSequence>,
                 {
                     fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<I1, I2>, I3>> {
                         return self.age
@@ -76,7 +76,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
                         quote_spanned! {f.span()=>
                             #field_type: emojfuscate::Emojfuscate<#iterator_type_name>,
-                            #iterator_type_name: Iterator<Item = emojfuscate::ByteOrBreak>,
+                            #iterator_type_name: Iterator<Item = emojfuscate::ByteInSequence>,
                         }
                     });
 
@@ -136,7 +136,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
                         quote_spanned! {f.span()=>
                             #field_type: emojfuscate::Emojfuscate<#iterator_type_name>,
-                            #iterator_type_name: Iterator<Item = emojfuscate::ByteOrBreak>,
+                            #iterator_type_name: Iterator<Item = emojfuscate::ByteInSequence>,
                         }
                     },
                 );
@@ -171,9 +171,9 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     u8: emojfuscate::Emojfuscate<I1>,
                     String: emojfuscate::Emojfuscate<I2>,
                     A: emojfuscate::Emojfuscate<I3>,
-                    I1: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I2: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I3: Iterator<Item = emojfuscate::ByteOrBreak>,
+                    I1: Iterator<Item = emojfuscate::ByteInSequence>,
+                    I2: Iterator<Item = emojfuscate::ByteInSequence>,
+                    I3: Iterator<Item = emojfuscate::ByteInSequence>,
                 {
                     fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<I1, I2>, I3>> {
                         let Person(field0, field1, field2) = self;
@@ -219,7 +219,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     impl<#(#generics),*> emojfuscate::Emojfuscate<I> for #name #ty_generics
                     where
                         (): emojfuscate::Emojfuscate<I>,
-                        I: Iterator<Item = emojfuscate::ByteOrBreak>,
+                        I: Iterator<Item = emojfuscate::ByteInSequence>,
                     {
                         fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<I> {
                             ().emojfuscate_stream()
@@ -240,14 +240,14 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
             the generated code should look something like this:
 
-            impl<IA, IB> emojfuscate::Emojfuscate<Chain<Chain<Once<emojfuscate::ByteOrBreak>, IA>, IB>> for Animal
+            impl<IA, IB> emojfuscate::Emojfuscate<Chain<Chain<Once<emojfuscate::ByteInSequence>, IA>, IB>> for Animal
             where
                 Option<(bool, String)>: emojfuscate::Emojfuscate<IA>,
                 Option<u32>: emojfuscate::Emojfuscate<IB>,
-                IA: Iterator<Item = emojfuscate::ByteOrBreak>,
-                IB: Iterator<Item = emojfuscate::ByteOrBreak>,
+                IA: Iterator<Item = emojfuscate::ByteInSequence>,
+                IB: Iterator<Item = emojfuscate::ByteInSequence>,
             {
-                fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<Once<emojfuscate::ByteOrBreak>, IA>, IB>> {
+                fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<Once<emojfuscate::ByteInSequence>, IA>, IB>> {
                     match self {
                         Animal::Cat(b,s) => {
                             0u8
@@ -294,12 +294,12 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
                             quote! {
                                 Option<#only_field>: emojfuscate::Emojfuscate<#iterator_name>,
-                                #iterator_name: Iterator<Item = emojfuscate::ByteOrBreak>
+                                #iterator_name: Iterator<Item = emojfuscate::ByteInSequence>
                             }
                         } else {
                             quote! {
                                 Option<(#(#field_types),*)>: emojfuscate::Emojfuscate<#iterator_name>,
-                                #iterator_name: Iterator<Item = emojfuscate::ByteOrBreak>
+                                #iterator_name: Iterator<Item = emojfuscate::ByteInSequence>
                             }
                         })
                     }
@@ -313,12 +313,12 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
                             quote! {
                                 Option<#only_field>: emojfuscate::Emojfuscate<#iterator_name>,
-                                #iterator_name: Iterator<Item = emojfuscate::ByteOrBreak>
+                                #iterator_name: Iterator<Item = emojfuscate::ByteInSequence>
                             }
                         } else {
                             quote! {
                                 Option<(#(#field_types),*)>: emojfuscate::Emojfuscate<#iterator_name>,
-                                #iterator_name: Iterator<Item = emojfuscate::ByteOrBreak>
+                                #iterator_name: Iterator<Item = emojfuscate::ByteInSequence>
                             }
                         })
                     }
@@ -448,7 +448,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     quote! {#ident}
                 });
 
-            let iterator_chain_type = once(quote! {Once<emojfuscate::ByteOrBreak>})
+            let iterator_chain_type = once(quote! {Once<emojfuscate::ByteInSequence>})
                 .chain(iterator_names.clone())
                 .reduce(|chain, element| {
                     quote! {Chain<#chain, #element>}

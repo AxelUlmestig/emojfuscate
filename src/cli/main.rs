@@ -8,7 +8,9 @@ use std::process::ExitCode;
 use std::str;
 use uuid::Uuid;
 
-use emojfuscate::{Demojfuscate, Emojfuscate, FromEmojiError, IsEmojiRepresentation};
+use emojfuscate::{
+    ByteInSequence, Demojfuscate, Emojfuscate, FromEmojiError, IsEmojiRepresentation,
+};
 mod hex_stream;
 
 #[derive(Parser)]
@@ -154,33 +156,61 @@ fn main() -> ExitCode {
                             eprintln!("{}", error_message);
                             return ExitCode::FAILURE;
                         }
+                        Err(FromEmojiError::MissingSequenceStart) => {
+                            eprintln!("Expected a sequence start emoji when decoding data with variable length");
+                            return ExitCode::FAILURE;
+                        }
+                        Err(FromEmojiError::UnexpectedSequenceStart(err)) => {
+                            eprintln!("Unexpected a sequence start emoji {}", err);
+                            return ExitCode::FAILURE;
+                        }
+                        Err(FromEmojiError::UnexpectedSequenceEnd) => {
+                            eprintln!("Unexpected a sequence end emoji when decoding data");
+                            return ExitCode::FAILURE;
+                        }
                     }
                 }
                 DataType::Hexadecimal => match input.as_str() {
                     "-" => {
-                        for byte in unwrapped_std_in.demojfuscate_stream() {
-                            stream
-                                .write(hex::encode(&[byte.unwrap()]).as_bytes())
-                                .unwrap();
+                        for parsed_byte in unwrapped_std_in.demojfuscate_stream() {
+                            let byte = match parsed_byte {
+                                Ok(ByteInSequence::Byte(b)) => b,
+                                _ => continue,
+                            };
+
+                            stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
                         }
                     }
                     some_string => {
-                        for byte in some_string.bytes().demojfuscate_stream() {
-                            stream
-                                .write(hex::encode(&[byte.unwrap()]).as_bytes())
-                                .unwrap();
+                        for parsed_byte in some_string.bytes().demojfuscate_stream() {
+                            let byte = match parsed_byte {
+                                Ok(ByteInSequence::Byte(b)) => b,
+                                _ => continue,
+                            };
+
+                            stream.write(hex::encode(&[byte]).as_bytes()).unwrap();
                         }
                     }
                 },
                 DataType::Text => match input.as_str() {
                     "-" => {
-                        for byte in unwrapped_std_in.demojfuscate_stream() {
-                            stream.write(&[byte.unwrap()]).unwrap();
+                        for parsed_byte in unwrapped_std_in.demojfuscate_stream() {
+                            let byte = match parsed_byte {
+                                Ok(ByteInSequence::Byte(b)) => b,
+                                _ => continue,
+                            };
+
+                            stream.write(&[byte]).unwrap();
                         }
                     }
                     some_string => {
-                        for byte in some_string.demojfuscate_stream() {
-                            stream.write(&[byte.unwrap()]).unwrap();
+                        for parsed_byte in some_string.demojfuscate_stream() {
+                            let byte = match parsed_byte {
+                                Ok(ByteInSequence::Byte(b)) => b,
+                                _ => continue,
+                            };
+
+                            stream.write(&[byte]).unwrap();
                         }
                     }
                 },
