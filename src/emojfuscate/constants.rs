@@ -7,6 +7,7 @@ pub const MAX_EMOJI_VALUE: u16 = u16::pow(2, BITS_PER_EMOJI as u32);
 pub const START_EMOJI_VALUE: u16 = MAX_EMOJI_VALUE + BITS_PER_EMOJI + 1;
 pub const STOP_EMOJI_VALUE: u16 = MAX_EMOJI_VALUE + BITS_PER_EMOJI + 2;
 
+#[derive(Copy, Clone)]
 pub enum ByteInSequence {
     SequenceStart,
     Byte(u8),

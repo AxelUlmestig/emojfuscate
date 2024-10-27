@@ -383,8 +383,12 @@ where
 }
 
 impl<A, IA>
-    Emojfuscate<Chain<IntoIter<ByteInSequence, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>>
-    for Vec<A>
+    Emojfuscate<
+        Chain<
+            Chain<Once<ByteInSequence>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>,
+            Once<ByteInSequence>,
+        >,
+    > for Vec<A>
 where
     A: Emojfuscate<IA>,
     IA: Iterator<Item = ByteInSequence>,
@@ -392,25 +396,16 @@ where
     fn emojfuscate_stream(
         self,
     ) -> EncodeBytesAsEmoji<
-        Chain<IntoIter<ByteInSequence, 2>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>,
+        Chain<
+            Chain<Once<ByteInSequence>, FlatMap<std::vec::IntoIter<A>, IA, fn(A) -> IA>>,
+            Once<ByteInSequence>,
+        >,
     > {
-        let element_count = match u16::try_from(self.len()) {
-            Ok(count) => count,
-            // TODO: is there a more graceful way to handle this?
-            Err(err) => panic!(
-                "can't emojfuscate lists that are longer than 2^16 elements, {}",
-                err
-            ),
-        };
-
-        let content_data = self
-            .into_iter()
+        self.into_iter()
             .flat_map(get_emojfuscate_iter as fn(A) -> IA)
-            .emojfuscate_stream();
-
-        return element_count
             .emojfuscate_stream()
-            .chain_emoji_bytes(content_data);
+            .add_start_emoji()
+            .add_stop_emoji()
     }
 }
 

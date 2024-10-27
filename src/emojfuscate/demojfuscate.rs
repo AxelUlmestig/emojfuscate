@@ -57,6 +57,7 @@ where
     accumulated_data: u16,
     defined_bits: u16,
     bits_to_truncate: u16,
+    peeked_at: Option<Option<Result<ByteInSequence, FromEmojiError>>>,
 }
 
 impl<I> DecodeEmojiToBytes<I>
@@ -69,7 +70,32 @@ where
             accumulated_data: 0,
             defined_bits: 0,
             bits_to_truncate: 0,
+            peeked_at: None,
         }
+    }
+
+    // If I were a better rustacean I would have written an implementation of `peek`, Alas...
+    pub fn reached_end_of_sequence(&mut self) -> bool {
+        match &self.peeked_at {
+            Some(Some(Ok(ByteInSequence::SequenceEnd))) => {
+                return true;
+            }
+            Some(_) => {
+                return false;
+            }
+            None => {
+                let peeked_at = self.next();
+
+                let reached_end = match peeked_at {
+                    Some(Ok(ByteInSequence::SequenceEnd)) => true,
+                    _ => false,
+                };
+
+                self.peeked_at = Some(peeked_at);
+
+                return reached_end;
+            }
+        };
     }
 }
 
@@ -80,6 +106,13 @@ where
 {
     type Item = Result<ByteInSequence, FromEmojiError>;
     fn next(&mut self) -> Option<Result<ByteInSequence, FromEmojiError>> {
+        match self.peeked_at.take() {
+            Some(peeked_at) => {
+                return peeked_at;
+            }
+            None => (),
+        };
+
         loop {
             if self.defined_bits >= BITS_IN_A_BYTE {
                 let u16_byte_to_output =
@@ -502,27 +535,31 @@ where
     A: ConstructFromEmoji<A, I>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
+        mut byte_stream: DecodeEmojiToBytes<I>,
     ) -> Result<(Vec<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
-        let (element_count, mut byte_stream_after_1) = match u16::construct_from_emoji(byte_stream)
-        {
-            Err(err) => return Err(err),
-            Ok(result) => result,
-        };
-
-        let mut vec = Vec::with_capacity(usize::from(element_count));
-
-        for element_index in 0..usize::from(element_count) {
-            match A::construct_from_emoji(byte_stream_after_1) {
-                Err(err) => return Err(err),
-                Ok((x, new_byte_stream)) => {
-                    byte_stream_after_1 = new_byte_stream;
-                    vec.insert(element_index, x);
-                }
-            };
+        match byte_stream.next() {
+            Some(Ok(ByteInSequence::SequenceStart)) => {}
+            Some(Ok(_)) => return Err(FromEmojiError::MissingSequenceStart),
+            Some(Err(err)) => return Err(err),
+            None => return Err(FromEmojiError::NotEnoughEmoji),
         }
 
-        return Ok((vec, byte_stream_after_1));
+        let mut vec = Vec::new();
+
+        loop {
+            if byte_stream.reached_end_of_sequence() {
+                byte_stream.next(); // pop off the SequenceEnd value
+                return Ok((vec, byte_stream));
+            }
+
+            match A::construct_from_emoji(byte_stream) {
+                Ok((element, new_byte_stream)) => {
+                    byte_stream = new_byte_stream;
+                    vec.push(element);
+                }
+                Err(err) => return Err(err),
+            };
+        }
     }
 }
 
