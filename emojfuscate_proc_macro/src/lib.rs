@@ -12,13 +12,53 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
     let expanded = match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
-                let iterator_names = fields.named.iter().enumerate().map(|(i, f)| {
-                    let ident = Ident::new(&format!("I{}", i), Span::call_site());
-                    quote_spanned! {f.span()=>#ident}
-                });
+                /*
+                // For a struct with named fields, e.g.
 
-                let chained_fields = fields
-                    .named
+                struct Person<A> {
+                    age: u8,
+                    name: String,
+                    luggage: A
+                }
+
+                // It should generate code that looks like this:
+                // (notice how the field names come in alphabetical order, i.e. age, luggage, name)
+
+                impl<I1, I2, I3, A> emojfuscate::Emojfuscate<Chain<Chain<I1, I2>, I3>> for Person<A>
+                where
+                    u8: emojfuscate::Emojfuscate<I1>,
+                    A: emojfuscate::Emojfuscate<I2>,
+                    String: emojfuscate::Emojfuscate<I3>,
+                    I1: Iterator<Item = emojfuscate::ByteOrBreak>,
+                    I2: Iterator<Item = emojfuscate::ByteOrBreak>,
+                    I3: Iterator<Item = emojfuscate::ByteOrBreak>,
+                {
+                    fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<I1, I2>, I3>> {
+                        return self.age
+                            .emojfuscate_stream()
+                            .chain_emoji_bytes(self.luggage.emojfuscate_stream())
+                            .chain_emoji_bytes(self.name.emojfuscate_stream());
+                    }
+                }
+                */
+
+                let alphabetically_sorted_fields = {
+                    let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                    named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                    named_fields_to_sort
+                };
+
+                let iterator_names =
+                    alphabetically_sorted_fields
+                        .iter()
+                        .enumerate()
+                        .map(|(i, f)| {
+                            let ident = Ident::new(&format!("I{}", i), Span::call_site());
+                            quote_spanned! {f.span()=>#ident}
+                        });
+
+                let chained_fields = alphabetically_sorted_fields
                     .iter()
                     .map(|f| {
                         let name = &f.ident;
@@ -28,16 +68,17 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                         quote_spanned! {f.span()=>#prev.chain_emoji_bytes(#f)}
                     });
 
-                let field_types = fields.named.iter().zip(iterator_names.clone()).map(
-                    |(f, iterator_type_name)| {
+                let field_types = alphabetically_sorted_fields
+                    .iter()
+                    .zip(iterator_names.clone())
+                    .map(|(f, iterator_type_name)| {
                         let field_type = &f.ty;
 
                         quote_spanned! {f.span()=>
                             #field_type: emojfuscate::Emojfuscate<#iterator_type_name>,
                             #iterator_type_name: Iterator<Item = emojfuscate::ByteOrBreak>,
                         }
-                    },
-                );
+                    });
 
                 let iterator_chain = iterator_names.clone().reduce(|chain, element| {
                     quote! {Chain<#chain, #element>}
@@ -57,35 +98,6 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     .chain(iterator_names);
 
                 let (_, ty_generics, _) = input.generics.split_for_impl();
-
-                /*
-                // For a struct with named fields, e.g.
-
-                struct Person<A> {
-                    age: u8,
-                    name: String,
-                    luggage: A
-                }
-
-                // It should generate code that looks like this:
-
-                impl<I1, I2, I3, A> emojfuscate::Emojfuscate<Chain<Chain<I1, I2>, I3>> for Person<A>
-                where
-                    u8: emojfuscate::Emojfuscate<I1>,
-                    String: emojfuscate::Emojfuscate<I2>,
-                    A: emojfuscate::Emojfuscate<I3>,
-                    I1: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I2: Iterator<Item = emojfuscate::ByteOrBreak>,
-                    I3: Iterator<Item = emojfuscate::ByteOrBreak>,
-                {
-                    fn emojfuscate_stream(self) -> emojfuscate::EncodeBytesAsEmoji<Chain<Chain<I1, I2>, I3>> {
-                        return self.age
-                            .emojfuscate_stream()
-                            .chain_emoji_bytes(self.name.emojfuscate_stream())
-                            .chain_emoji_bytes(self.luggage.emojfuscate_stream());
-                    }
-                }
-                */
 
                 quote! {
                     impl<#(#generics),*> emojfuscate::Emojfuscate<#iterator_chain> for #name #ty_generics
@@ -221,7 +233,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
             For an enum that looks like this:
 
             enum Animal {
-                Cat{ likes_cuddles: bool, name: String},
+                Cat{ name: String, likes_cuddles: bool },
                 Dog(u32),
                 Lizard
             }
@@ -266,7 +278,14 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                 .enumerate()
                 .filter_map(|(variant_index, variant)| match variant.fields {
                     Fields::Named(ref fields) => {
-                        let mut field_types = fields.named.iter().map(|f| &f.ty);
+                        let alphabetically_sorted_fields = {
+                            let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                            named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                            named_fields_to_sort
+                        };
+
+                        let mut field_types = alphabetically_sorted_fields.iter().map(|f| &f.ty);
                         let iterator_name =
                             Ident::new(&format!("I{}", variant_index), Span::call_site());
 
@@ -317,8 +336,16 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
 
                         match variant.fields {
                             Fields::Named(ref fields) => {
+                                let alphabetically_sorted_fields = {
+                                    let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                                    named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                                    named_fields_to_sort
+                                };
+
                                 let variant_name = &variant.ident;
-                                let field_names = fields.named.iter()
+
+                                let field_names = alphabetically_sorted_fields.iter()
                                         .map(|f| {
                                             let field_name = &f.ident;
                                             quote_spanned! {f.span()=>#field_name}
@@ -331,7 +358,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                                         _ => true,
                                     }).map(|(i, _)| {
                                     if i as u8 == variant_index {
-                                        let field_names2 = fields.named.iter()
+                                        let field_names2 = alphabetically_sorted_fields.iter()
                                                 .map(|f| {
                                                     let field_name = &f.ident;
                                                     quote_spanned! {f.span()=>#field_name}
@@ -482,7 +509,14 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
     let demojfuscated_fields = match input.data {
         Data::Struct(ref data) => match data.fields {
             Fields::Named(ref fields) => {
-                let declare_fields = fields.named.iter().map(|f| {
+                let alphabetically_sorted_fields = {
+                    let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                    named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                    named_fields_to_sort
+                };
+
+                let declare_fields = alphabetically_sorted_fields.iter().map(|f| {
                     let field_name = &f.ident;
                     let field_type = &f.ty;
                     quote_spanned! {f.span()=>
@@ -497,7 +531,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                     }
                 });
 
-                let field_constructors = fields.named.iter().map(|f| {
+                let field_constructors = alphabetically_sorted_fields.iter().map(|f| {
                     let field_name = &f.ident;
 
                     quote_spanned! {f.span()=>
@@ -565,7 +599,14 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
             let parsed_data = data.variants.iter().enumerate().filter_map(|(variant_index, variant)|
                 match variant.fields {
                     Fields::Named(ref fields) => {
-                        let mut field_types = fields.named.iter().map(|f| &f.ty);
+                        let alphabetically_sorted_fields = {
+                            let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                            named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                            named_fields_to_sort
+                        };
+
+                        let mut field_types = alphabetically_sorted_fields.iter().map(|f| &f.ty);
                         let constructor_name =
                             Ident::new(&format!("constructor{}", variant_index), Span::call_site());
 
@@ -639,7 +680,14 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
 
                     match variant.fields {
                         Fields::Named(ref fields) => {
-                            let field_names = fields.named.iter().map(|f| &f.ident);
+                            let alphabetically_sorted_fields = {
+                                let mut named_fields_to_sort = fields.named.iter().collect::<Vec<_>>();
+                                named_fields_to_sort.sort_by_key(|f| &f.ident);
+
+                                named_fields_to_sort
+                            };
+
+                            let field_names = alphabetically_sorted_fields.iter().map(|f| &f.ident);
                             let index = variant_index as u8;
 
                             let pattern_matching_data =
@@ -653,7 +701,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                     })
                                     .map(|(i, _)| {
                                         if i as u8 == variant_index as u8 {
-                                            let field_names2 = fields.named.iter().map(|f| &f.ident);
+                                            let field_names2 = alphabetically_sorted_fields.iter().map(|f| &f.ident);
 
                                             quote! {
                                                 Some((#(#field_names2),*))

@@ -36,7 +36,7 @@ assert_eq!(deserialized_person, Ok(original_person));
 
 ### Laziness
 
-In order to further embrace human properties, Emojfuscate is as lazy as
+To further embrace human properties, Emojfuscate is as lazy as
 possible. Any iterator of `u8` can be turned into a lazy iterator of emoji.
 
 ```rust

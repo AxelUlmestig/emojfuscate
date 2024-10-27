@@ -294,8 +294,10 @@ mod tests {
         #[test]
         fn emojfuscate_derive_enum(input : Result<Option<(bool, String)>, Result<u32, ((), i16)>>) {
             #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq, Clone)]
+            // `name` and `likes_cuddles` are not alphabetically sorted here to make sure that the
+            // machinery that emojfuscates the fields in alphabetical order works
             enum Animal {
-                Cat{ likes_cuddles: bool, name: String },
+                Cat{ name: String, likes_cuddles: bool },
                 Lizard,
                 Dog(u32),
                 Donkey((), i16)
