@@ -9,9 +9,9 @@ use super::constants::{
 };
 
 // fundamental traits
-pub trait Demojfuscate<A, I>
+pub trait Demojfuscate<'a, A, I>
 where
-    Self: IsEmojiRepresentation<I>,
+    Self: IsEmojiRepresentation<'a, I>,
     A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>,
 {
@@ -20,11 +20,11 @@ where
         Self: Sized;
 }
 
-pub trait IsEmojiRepresentation<I>
+pub trait IsEmojiRepresentation<'a, I>
 where
     I: Iterator<Item = u8>,
 {
-    fn demojfuscate_stream(&mut self) -> DecodeEmojiToBytes<I>;
+    fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<'a, I>;
 }
 
 pub trait ConstructFromEmoji<A, I>
@@ -214,8 +214,8 @@ where
     }
 }
 
-impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
-    fn demojfuscate_stream(&mut self) -> DecodeEmojiToBytes<I> {
+impl<'a, I: Iterator<Item = u8>> IsEmojiRepresentation<'a, I> for I {
+    fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
     }
 }
@@ -224,25 +224,41 @@ impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
 impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
     fn demojfuscate_stream(&mut self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
 */
-impl<'a> IsEmojiRepresentation<std::iter::Cloned<std::slice::Iter<'a, u8>>> for String {
+
+/*
+impl<'a> IsEmojiRepresentation<'a, std::iter::Copied<std::slice::Iter<'a, u8>>> for String {
     fn demojfuscate_stream(
         &'a mut self,
-    ) -> DecodeEmojiToBytes<std::iter::Cloned<std::slice::Iter<'a, u8>>> {
-        /*
-        let cloned_thingy: std::iter::Cloned<std::slice::Iter<'a, u8>> =
-            self.as_bytes().iter().cloned();
-        for x in self.as_bytes().iter().cloned() {
-            let y: u8 = x;
-            println!("{y}");
-        }
+    ) -> DecodeEmojiToBytes<std::iter::Copied<std::slice::Iter<'a, u8>>> {
+        // let cloned_thingy: std::iter::Cloned<std::slice::Iter<'a, u8>> =
+        //     self.as_bytes().iter().cloned();
+        // for x in self.as_bytes().iter().cloned() {
+        //     let y: u8 = x;
+        //     println!("{y}");
+        // }
 
-        for x in self.as_bytes().iter() {
-            let y: u8 = *x;
-            println!("{y}");
-        }
-        */
+        // for x in self.as_bytes().iter() {
+        //     let y: u8 = *x;
+        //     println!("{y}");
+        // }
 
-        self.as_bytes().iter().cloned().demojfuscate_stream()
+        // self.as_bytes().iter().cloned().demojfuscate_stream()
+        self.as_bytes().iter().copied().demojfuscate_stream()
+    }
+}
+*/
+
+impl<'a> IsEmojiRepresentation<'a, std::iter::Map<std::slice::Iter<'a, u8>, fn(&u8) -> u8>>
+    for String
+{
+    fn demojfuscate_stream(
+        &'a mut self,
+    ) -> DecodeEmojiToBytes<std::iter::Map<std::slice::Iter<'a, u8>, fn(&u8) -> u8>> {
+        // self.as_bytes().iter().cloned().demojfuscate_stream()
+        self.as_bytes()
+            .into_iter()
+            .map(|b| *b)
+            .demojfuscate_stream()
     }
 }
 

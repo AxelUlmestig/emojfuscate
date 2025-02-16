@@ -57,6 +57,8 @@ impl std::fmt::Display for DataType {
     }
 }
 
+fn main() {}
+/*
 fn main() -> ExitCode {
     let cli = Cli::parse();
 
@@ -226,3 +228,4 @@ fn main() -> ExitCode {
 
     return ExitCode::SUCCESS;
 }
+*/
