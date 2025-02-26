@@ -12,10 +12,10 @@ use super::constants::{
 pub trait Demojfuscate<'a, A, I>
 where
     Self: IsEmojiRepresentation<'a, I>,
-    A: ConstructFromEmoji<A, I>,
-    I: Iterator<Item = u8>,
+    A: ConstructFromEmoji<'a, A, I>,
+    I: Iterator<Item = u8> + 'a,
 {
-    fn demojfuscate(&mut self) -> Result<A, FromEmojiError>
+    fn demojfuscate(&'a mut self) -> Result<A, FromEmojiError>
     where
         Self: Sized;
 }
@@ -27,11 +27,13 @@ where
     fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<'a, I>;
 }
 
-pub trait ConstructFromEmoji<A, I>
+pub trait ConstructFromEmoji<'a, A, I>
 where
-    I: Iterator<Item = u8>,
+    I: Iterator<Item = u8> + 'a,
 {
-    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError>
+    fn construct_from_emoji(
+        byte_stream: &mut DecodeEmojiToBytes<'a, I>,
+    ) -> Result<A, FromEmojiError>
     where
         Self: Sized;
 }
@@ -193,13 +195,13 @@ where
     }
 }
 
-impl<A, B, I> Demojfuscate<B, I> for A
+impl<'a, A, B, I> Demojfuscate<'a, B, I> for A
 where
-    Self: IsEmojiRepresentation<I>,
-    B: ConstructFromEmoji<B, I>,
-    I: Iterator<Item = u8>,
+    Self: IsEmojiRepresentation<'a, I>,
+    B: ConstructFromEmoji<'a, B, I>,
+    I: Iterator<Item = u8> + 'a,
 {
-    fn demojfuscate(&mut self) -> Result<B, FromEmojiError>
+    fn demojfuscate(&'a mut self) -> Result<B, FromEmojiError>
     where
         Self: Sized,
     {
@@ -248,6 +250,7 @@ impl<'a> IsEmojiRepresentation<'a, std::iter::Copied<std::slice::Iter<'a, u8>>> 
 }
 */
 
+/*
 impl<'a> IsEmojiRepresentation<'a, std::iter::Map<std::slice::Iter<'a, u8>, fn(&u8) -> u8>>
     for String
 {
@@ -261,6 +264,7 @@ impl<'a> IsEmojiRepresentation<'a, std::iter::Map<std::slice::Iter<'a, u8>, fn(&
             .demojfuscate_stream()
     }
 }
+*/
 
 /*
 impl<'a> IsEmojiRepresentation<i64> for String {
@@ -372,24 +376,24 @@ impl<'a> IsEmojiRepresentation<i64> for String {
 //     }
 // }
 //
-// impl<I> ConstructFromEmoji<u8, I> for u8
-// where
-//     I: Iterator<Item = u8>,
-// {
-//     fn construct_from_emoji(
-//         mut byte_stream: DecodeEmojiToBytes<I>,
-//     ) -> Result<(u8, DecodeEmojiToBytes<I>), FromEmojiError> {
-//         match byte_stream.next() {
-//             Some(Ok(ByteInSequence::Byte(byte))) => Ok((byte, byte_stream)),
-//             Some(Ok(ByteInSequence::SequenceStart)) => Err(
-//                 FromEmojiError::UnexpectedSequenceStart("When demojfuscating u8".to_string()),
-//             ),
-//             Some(Ok(ByteInSequence::SequenceEnd)) => Err(FromEmojiError::UnexpectedSequenceEnd),
-//             Some(Err(err)) => Err(err),
-//             None => Err(FromEmojiError::NotEnoughEmoji),
-//         }
-//     }
-// }
+impl<'a, I> ConstructFromEmoji<'a, u8, I> for u8
+where
+    I: Iterator<Item = u8> + 'a,
+{
+    fn construct_from_emoji(
+        byte_stream: &mut DecodeEmojiToBytes<'a, I>,
+    ) -> Result<u8, FromEmojiError> {
+        match byte_stream.next() {
+            Some(Ok(ByteInSequence::Byte(byte))) => Ok(byte),
+            Some(Ok(ByteInSequence::SequenceStart)) => Err(
+                FromEmojiError::UnexpectedSequenceStart("When demojfuscating u8".to_string()),
+            ),
+            Some(Ok(ByteInSequence::SequenceEnd)) => Err(FromEmojiError::UnexpectedSequenceEnd),
+            Some(Err(err)) => Err(err),
+            None => Err(FromEmojiError::NotEnoughEmoji),
+        }
+    }
+}
 //
 // impl<I> ConstructFromEmoji<u16, I> for u16
 // where
