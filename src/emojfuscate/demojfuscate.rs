@@ -15,6 +15,8 @@ where
     A: ConstructFromEmoji<'a, A, I>,
     I: Iterator<Item = u8> + 'a,
 {
+    fn demojfuscate_stream(&'a mut self) -> DemojfuscateIterator<'a, A, I>;
+
     fn demojfuscate(&'a mut self) -> Result<A, FromEmojiError>
     where
         Self: Sized;
@@ -201,24 +203,87 @@ where
     B: ConstructFromEmoji<'a, B, I>,
     I: Iterator<Item = u8> + 'a,
 {
+    fn demojfuscate_stream(&'a mut self) -> DemojfuscateIterator<'a, B, I> {
+        DemojfuscateIterator {
+            iter: self.demojfuscate_stream(),
+            past_sequence_start: false,
+            reached_sequence_end: false,
+            encountered_error: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
     fn demojfuscate(&'a mut self) -> Result<B, FromEmojiError>
     where
         Self: Sized,
     {
-        // let mut x = self.demojfuscate_stream();
         B::construct_from_emoji(&mut self.demojfuscate_stream())
-        /*
-        match B::construct_from_emoji(self.demojfuscate_stream()) {
-            Ok((value, _)) => Ok(value),
-            Err(err) => Err(err),
-        }
-        */
     }
 }
 
 impl<'a, I: Iterator<Item = u8>> IsEmojiRepresentation<'a, I> for I {
     fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
+    }
+}
+
+// demojfuscate_stream related stuff
+pub struct DemojfuscateIterator<'a, A, I>
+where
+    A: ConstructFromEmoji<'a, A, I>,
+    I: Iterator<Item = u8> + 'a,
+{
+    iter: DecodeEmojiToBytes<'a, I>,
+    past_sequence_start: bool,
+    reached_sequence_end: bool,
+    encountered_error: bool,
+    _phantom: std::marker::PhantomData<A>,
+}
+
+impl<'a, A, I> Iterator for DemojfuscateIterator<'a, A, I>
+where
+    A: ConstructFromEmoji<'a, A, I>,
+    I: Iterator<Item = u8> + 'a,
+{
+    type Item = Result<A, FromEmojiError>;
+    fn next(&mut self) -> Option<Result<A, FromEmojiError>> {
+        if self.reached_sequence_end || self.encountered_error {
+            return None;
+        }
+
+        if !self.past_sequence_start {
+            match self.iter.next() {
+                Some(Ok(ByteInSequence::SequenceStart)) => {
+                    self.past_sequence_start = true;
+                }
+                Some(Ok(_)) => {
+                    self.encountered_error = true;
+                    return Some(Err(FromEmojiError::MissingSequenceStart));
+                }
+                Some(Err(err)) => {
+                    self.encountered_error = true;
+                    return Some(Err(err));
+                }
+                None => {
+                    self.encountered_error = true;
+                    return Some(Err(FromEmojiError::NotEnoughEmoji));
+                }
+            }
+        }
+
+        if self.iter.reached_end_of_sequence() {
+            self.iter.next(); // pop off the SequenceEnd value
+            self.reached_sequence_end = true;
+            return None;
+        }
+
+        match A::construct_from_emoji(&mut self.iter) {
+            Ok(value) => return Some(Ok(value)),
+            Err(err) => {
+                self.encountered_error = true;
+                return Some(Err(err));
+            }
+        };
     }
 }
 
