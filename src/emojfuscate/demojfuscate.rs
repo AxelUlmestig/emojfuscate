@@ -26,7 +26,7 @@ pub trait IsEmojiRepresentation<'a, I>
 where
     I: Iterator<Item = u8>,
 {
-    fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<'a, I>;
+    fn demojfuscate_byte_stream(&'a mut self) -> DecodeEmojiToBytes<'a, I>;
 }
 
 pub trait ConstructFromEmoji<'a, A, I>
@@ -205,7 +205,7 @@ where
 {
     fn demojfuscate_stream(&'a mut self) -> DemojfuscateIterator<'a, B, I> {
         DemojfuscateIterator {
-            iter: self.demojfuscate_stream(),
+            iter: self.demojfuscate_byte_stream(),
             past_sequence_start: false,
             reached_sequence_end: false,
             encountered_error: false,
@@ -217,12 +217,12 @@ where
     where
         Self: Sized,
     {
-        B::construct_from_emoji(&mut self.demojfuscate_stream())
+        B::construct_from_emoji(&mut self.demojfuscate_byte_stream())
     }
 }
 
 impl<'a, I: Iterator<Item = u8>> IsEmojiRepresentation<'a, I> for I {
-    fn demojfuscate_stream(&'a mut self) -> DecodeEmojiToBytes<I> {
+    fn demojfuscate_byte_stream(&'a mut self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
     }
 }
