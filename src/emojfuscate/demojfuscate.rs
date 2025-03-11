@@ -53,7 +53,7 @@ pub enum FromEmojiError {
 
 pub struct DecodeEmojiToBytes<'a, I>
 where
-    I: Iterator<Item = u8>,
+    I: Iterator<Item = u8> + 'a,
 {
     iter: &'a mut I,
     accumulated_data: u16,
@@ -227,6 +227,48 @@ impl<'a, I: Iterator<Item = u8>> IsEmojiRepresentation<'a, I> for I {
     }
 }
 
+impl<'a> IsEmojiRepresentation<'a, std::iter::Map<core::slice::Iter<'a, u8>, fn(&u8) -> u8>>
+    for String
+{
+    fn demojfuscate_byte_stream(
+        &'a mut self,
+    ) -> DecodeEmojiToBytes<'a, std::iter::Map<core::slice::Iter<'a, u8>, fn(&u8) -> u8>> {
+        let clone_byte_fn: fn(&u8) -> u8 = clone_byte;
+        /*
+        let mut iter = self.as_bytes().into_iter().map(clone_byte_fn);
+        DecodeEmojiToBytes::new(&mut iter)
+        */
+
+        // DecodeEmojiToBytes::new(&mut self.as_bytes().into_iter().map(clone_byte_fn))
+
+        // Box the iterator to allocate it on the heap
+        let mut boxed_iter = Box::new(self.as_bytes().into_iter().map(clone_byte_fn));
+        // Pass a mutable reference to the boxed iterator
+        DecodeEmojiToBytes::new(&mut *boxed_iter)
+    }
+}
+
+fn clone_byte(b: &u8) -> u8 {
+    b.clone()
+}
+
+/*
+impl<'a> IsEmojiRepresentation<'a, ?> for String {
+    fn demojfuscate_byte_stream(&'a mut self) -> DecodeEmojiToBytes<'a, ?> {
+        self.as_bytes()
+            .into_iter()
+            .map(|b| b.clone())
+            .demojfuscate_byte_stream()
+    }
+}
+*/
+
+/*
+let mut bytes: Vec<u8> = self.bytes().collect();
+bytes.iter_mut().demojfuscate_byte_stream()
+*/
+// self.as_bytes().into_iter().demojfuscate_byte_stream()
+
 // demojfuscate_stream related stuff
 pub struct DemojfuscateIterator<'a, A, I>
 where
@@ -238,6 +280,14 @@ where
     reached_sequence_end: bool,
     encountered_error: bool,
     _phantom: std::marker::PhantomData<A>,
+}
+
+fn test_if_stdin_works() -> () {
+    use std::io;
+    use std::io::Read;
+
+    let mut unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
+    let x: Result<u8, FromEmojiError> = unwrapped_std_in.demojfuscate();
 }
 
 impl<'a, A, I> Iterator for DemojfuscateIterator<'a, A, I>
