@@ -33,20 +33,20 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn emojfuscate_derive_construct_from_emoji_unit_struct() {
-    //     #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq)]
-    //     struct UnitStruct;
+    #[test]
+    fn emojfuscate_derive_construct_from_emoji_unit_struct() {
+        #[derive(Emojfuscate, ConstructFromEmoji, Debug, PartialEq)]
+        struct UnitStruct;
 
-    //     let emojified = UnitStruct.emojfuscate();
-    //     let roundtrip_message = emojified.clone().demojfuscate();
-    //     assert_eq!(
-    //         roundtrip_message,
-    //         Ok(UnitStruct),
-    //         "emojfuscated version: {}",
-    //         emojified
-    //     );
-    // }
+        let emojified = UnitStruct.emojfuscate();
+        let roundtrip_message = emojified.clone().demojfuscate();
+        assert_eq!(
+            roundtrip_message,
+            Ok(UnitStruct),
+            "emojfuscated version: {}",
+            emojified
+        );
+    }
 
     proptest! {
         #[test]

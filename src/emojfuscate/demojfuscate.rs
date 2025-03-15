@@ -250,14 +250,6 @@ where
     _phantom: std::marker::PhantomData<A>,
 }
 
-fn test_if_stdin_works() -> () {
-    use std::io;
-    use std::io::Read;
-
-    let mut unwrapped_std_in = io::stdin().bytes().map(|b| b.unwrap());
-    let x: Result<u8, FromEmojiError> = unwrapped_std_in.demojfuscate();
-}
-
 impl<A, I> Iterator for DemojfuscateIterator<A, I>
 where
     A: ConstructFromEmoji<A, I>,
