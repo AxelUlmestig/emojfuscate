@@ -157,11 +157,13 @@ impl<I: Iterator<Item = ByteInSequence>> Emojfuscate<I> for I {
     }
 }
 
+/*
 impl<I: Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteInSequence>> for I {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
         EncodeBytesAsEmoji::new(self.map(wrap_byte))
     }
 }
+*/
 
 impl Emojfuscate<Empty<ByteInSequence>> for () {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Empty<ByteInSequence>> {
@@ -315,9 +317,13 @@ impl<'a>
     > {
         self.bytes()
             .into_iter()
+            .map(wrap_byte as fn(u8) -> ByteInSequence)
             .emojfuscate_stream()
             .add_start_emoji()
             .add_stop_emoji()
+        /*
+        self.bytes().into_iter().emojfuscate_stream()
+        */
     }
 }
 
@@ -339,6 +345,7 @@ impl
     > {
         self.into_bytes()
             .into_iter()
+            .map(wrap_byte as fn(u8) -> ByteInSequence)
             .emojfuscate_stream()
             .add_start_emoji()
             .add_stop_emoji()
@@ -401,8 +408,25 @@ where
             Once<ByteInSequence>,
         >,
     > {
-        self.into_iter()
-            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
+        self.into_iter().emojfuscate_stream()
+    }
+}
+
+impl<I, A, IA>
+    Emojfuscate<
+        Chain<Chain<Once<ByteInSequence>, FlatMap<I, IA, fn(A) -> IA>>, Once<ByteInSequence>>,
+    > for I
+where
+    I: Iterator<Item = A>,
+    A: Emojfuscate<IA>,
+    IA: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<Chain<Once<ByteInSequence>, FlatMap<I, IA, fn(A) -> IA>>, Once<ByteInSequence>>,
+    > {
+        self.flat_map(get_emojfuscate_iter as fn(A) -> IA)
             .emojfuscate_stream()
             .add_start_emoji()
             .add_stop_emoji()
@@ -468,6 +492,7 @@ where
 }
 */
 
+/*
 impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
 where
     A: Emojfuscate<I1>,
@@ -482,7 +507,9 @@ where
             .chain_emoji_bytes(b.emojfuscate_stream());
     }
 }
+*/
 
+/*
 impl<A, B, C, IA, IB, IC> Emojfuscate<Chain<Chain<IA, IB>, IC>> for (A, B, C)
 where
     A: Emojfuscate<IA>,
@@ -500,6 +527,7 @@ where
             .chain_emoji_bytes(c.emojfuscate_stream());
     }
 }
+*/
 
 impl<A1, A2, A3, A4, I1, I2, I3, I4> Emojfuscate<Chain<Chain<Chain<I1, I2>, I3>, I4>>
     for (A1, A2, A3, A4)
