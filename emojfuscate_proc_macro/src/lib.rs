@@ -522,8 +522,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                     quote_spanned! {f.span()=>
                         let #field_name = match #field_type::construct_from_emoji(byte_stream) {
                             Err(err) => return Err(err),
-                            Ok((result, new_byte_stream)) => {
-                                byte_stream = new_byte_stream;
+                            Ok(result) => {
                                 result
                             }
                         };
@@ -542,12 +541,11 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                 quote! {
                     #(#declare_fields)*
 
-                    return Ok((
+                    return Ok(
                         #name {
                             #(#field_constructors)*
-                        },
-                        byte_stream
-                    ));
+                        }
+                    );
                 }
             }
             Fields::Unnamed(ref fields) => {
@@ -557,8 +555,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                     quote_spanned! {f.span()=>
                         let #field_name = match #field_type::construct_from_emoji(byte_stream) {
                             Err(err) => return Err(err),
-                            Ok((result, new_byte_stream)) => {
-                                byte_stream = new_byte_stream;
+                            Ok(result) => {
                                 result
                             }
                         };
@@ -577,21 +574,19 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                 quote! {
                     #(#declare_fields)*
 
-                    return Ok((
+                    return Ok(
                         #name (
                             #(#field_constructors),*
-                        ),
-                        byte_stream
-                    ));
+                        )
+                    );
 
                 }
             }
             Fields::Unit => {
                 quote!(
-                    return Ok((
-                        #name,
-                        byte_stream
-                    ));
+                    return Ok(
+                        #name
+                    );
                 )
             }
         },
@@ -617,8 +612,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                 let #constructor_name =
                                     match Option::<#only_field>::construct_from_emoji(byte_stream) {
                                         Err(err) => return Err(err),
-                                        Ok((x, new_byte_stream)) => {
-                                            byte_stream = new_byte_stream;
+                                        Ok(x) => {
                                             x
                                         }
                                     };
@@ -628,8 +622,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                 let #constructor_name =
                                     match Option::<(#(#field_types),*)>::construct_from_emoji(byte_stream) {
                                         Err(err) => return Err(err),
-                                        Ok((x, new_byte_stream)) => {
-                                            byte_stream = new_byte_stream;
+                                        Ok(x) => {
                                             x
                                         }
                                     };
@@ -648,8 +641,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                 let #constructor_name =
                                     match Option::<#only_field>::construct_from_emoji(byte_stream) {
                                         Err(err) => return Err(err),
-                                        Ok((x, new_byte_stream)) => {
-                                            byte_stream = new_byte_stream;
+                                        Ok(x) => {
                                             x
                                         }
                                     };
@@ -659,8 +651,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                 let #constructor_name =
                                     match Option::<(#(#field_types),*)>::construct_from_emoji(byte_stream) {
                                         Err(err) => return Err(err),
-                                        Ok((x, new_byte_stream)) => {
-                                            byte_stream = new_byte_stream;
+                                        Ok(x) => {
                                             x
                                         }
                                     };
@@ -713,7 +704,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
 
 
                             quote! {
-                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name{#(#field_names),*}, byte_stream))
+                                (#index #(, #pattern_matching_data)*) => Ok(#name::#variant_name{#(#field_names),*})
                             }
                         }
                         Fields::Unnamed(ref fields) => {
@@ -743,7 +734,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
 
 
                             quote! {
-                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name(#(#field_names),*), byte_stream))
+                                (#index #(, #pattern_matching_data)*) => Ok(#name::#variant_name(#(#field_names),*))
                             }
                         }
                         Fields::Unit => {
@@ -761,7 +752,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                                     .map(|_| { quote! {None} });
 
                             quote! {
-                                (#index #(, #pattern_matching_data)*) => Ok((#name::#variant_name, byte_stream))
+                                (#index #(, #pattern_matching_data)*) => Ok(#name::#variant_name)
                             }
                         }
                     }
@@ -781,8 +772,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
                 let constructor_discriminator =
                     match u8::construct_from_emoji(byte_stream) {
                         Err(err) => return Err(err),
-                        Ok((n, new_byte_stream)) => {
-                            byte_stream = new_byte_stream;
+                        Ok(n) => {
                             n
                         }
                     };
@@ -837,14 +827,13 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
         I: Iterator <Item = u8>,
         A: ConstructFromEmoji <A, I>,
     {
-        fn construct_from_emoji(mut byte_stream : DecodeEmojiToBytes <I>)
+        fn construct_from_emoji(byte_stream : &mut DecodeEmojiToBytes <I>)
             -> Result <(Person<A>, DecodeEmojiToBytes <I>), emojfuscate::FromEmojiError>
         {
             let age = match u8::construct_from_emoji(byte_stream)
                 {
                     Err(err) => return Err(err),
-                    Ok((result, new_byte_stream)) => {
-                        byte_stream = new_byte_stream;
+                    Ok(result) => {
                         result
                     }
                 };
@@ -852,8 +841,7 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
             let name = match String::construct_from_emoji(byte_stream)
                 {
                     Err(err) => return Err(err),
-                    Ok((result, new_byte_stream)) => {
-                        byte_stream = new_byte_stream;
+                    Ok(result) => {
                         result
                     }
                 };
@@ -861,13 +849,12 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
             let luggage = match A::construct_from_emoji(byte_stream)
                 {
                     Err(err) => return Err(err),
-                    Ok((result, new_byte_stream)) => {
-                        byte_stream = new_byte_stream;
+                    Ok(result) => {
                         result
                     }
                 };
 
-            return Ok((Person { age : age, name : name, luggage : luggage, }, byte_stream));
+            return Ok(Person { age : age, name : name, luggage : luggage, });
         }
     }
     */
@@ -879,8 +866,8 @@ pub fn derive_construct_from_emoji(raw_input: proc_macro::TokenStream) -> proc_m
             #(#implementations)*
         {
             fn construct_from_emoji(
-                mut byte_stream: emojfuscate::DecodeEmojiToBytes<I>,
-            ) -> Result<(#name #ty_generics, emojfuscate::DecodeEmojiToBytes<I>), emojfuscate::FromEmojiError> {
+                byte_stream: &mut emojfuscate::DecodeEmojiToBytes<I>,
+            ) -> Result<#name #ty_generics, emojfuscate::FromEmojiError> {
                 #demojfuscated_fields
             }
         }

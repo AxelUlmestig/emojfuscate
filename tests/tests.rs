@@ -209,6 +209,20 @@ mod tests {
         }
 
         #[test]
+        fn emojfuscate_u8_stream(original_message : Vec<u8>) {
+            let emojified = original_message.clone().emojfuscate();
+
+            let mut roundtrip_message: Vec<u8> = Vec::new();
+            for result in emojified.clone().demojfuscate_stream() {
+                match result {
+                    Ok(u) => roundtrip_message.push(u),
+                    Err(_err) => assert!(false, "error when parsing")
+                }
+            }
+            assert_eq!(roundtrip_message, original_message, "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
         fn emojfuscate_string_vec(string1 in "\\PC*", string2 in "\\PC*", string3 in "\\PC*") {
             let original_message = vec![string1, string2, string3];
             let emojified = original_message.clone().emojfuscate();

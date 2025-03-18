@@ -172,7 +172,7 @@ fn main() -> ExitCode {
                 }
                 DataType::Hexadecimal => match input.as_str() {
                     "-" => {
-                        for parsed_byte in unwrapped_std_in.demojfuscate_stream() {
+                        for parsed_byte in unwrapped_std_in.demojfuscate_byte_stream() {
                             let byte = match parsed_byte {
                                 Ok(ByteInSequence::Byte(b)) => b,
                                 _ => continue,
@@ -182,7 +182,7 @@ fn main() -> ExitCode {
                         }
                     }
                     some_string => {
-                        for parsed_byte in some_string.bytes().demojfuscate_stream() {
+                        for parsed_byte in some_string.bytes().demojfuscate_byte_stream() {
                             let byte = match parsed_byte {
                                 Ok(ByteInSequence::Byte(b)) => b,
                                 _ => continue,
@@ -194,7 +194,7 @@ fn main() -> ExitCode {
                 },
                 DataType::Text => match input.as_str() {
                     "-" => {
-                        for parsed_byte in unwrapped_std_in.demojfuscate_stream() {
+                        for parsed_byte in unwrapped_std_in.demojfuscate_byte_stream() {
                             let byte = match parsed_byte {
                                 Ok(ByteInSequence::Byte(b)) => b,
                                 _ => continue,
@@ -204,7 +204,7 @@ fn main() -> ExitCode {
                         }
                     }
                     some_string => {
-                        for parsed_byte in some_string.demojfuscate_stream() {
+                        for parsed_byte in some_string.demojfuscate_byte_stream() {
                             let byte = match parsed_byte {
                                 Ok(ByteInSequence::Byte(b)) => b,
                                 _ => continue,

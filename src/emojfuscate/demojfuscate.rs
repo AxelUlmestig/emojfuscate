@@ -15,6 +15,8 @@ where
     A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>,
 {
+    fn demojfuscate_stream(self) -> DemojfuscateIterator<A, I>;
+
     fn demojfuscate(self) -> Result<A, FromEmojiError>
     where
         Self: Sized;
@@ -24,16 +26,14 @@ pub trait IsEmojiRepresentation<I>
 where
     I: Iterator<Item = u8>,
 {
-    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<I>;
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I>;
 }
 
 pub trait ConstructFromEmoji<A, I>
 where
     I: Iterator<Item = u8>,
 {
-    fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(A, DecodeEmojiToBytes<I>), FromEmojiError>
+    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError>
     where
         Self: Sized;
 }
@@ -201,55 +201,109 @@ where
     B: ConstructFromEmoji<B, I>,
     I: Iterator<Item = u8>,
 {
+    fn demojfuscate_stream(self) -> DemojfuscateIterator<B, I> {
+        DemojfuscateIterator {
+            iter: self.demojfuscate_byte_stream(),
+            past_sequence_start: false,
+            reached_sequence_end: false,
+            encountered_error: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
     fn demojfuscate(self) -> Result<B, FromEmojiError>
     where
         Self: Sized,
     {
-        match B::construct_from_emoji(self.demojfuscate_stream()) {
-            Ok((value, _)) => Ok(value),
-            Err(err) => Err(err),
-        }
+        B::construct_from_emoji(&mut self.demojfuscate_byte_stream())
     }
 }
 
 impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
-    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<I> {
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
     }
 }
 
 impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
-    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
-        self.into_bytes().into_iter().demojfuscate_stream()
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
+        self.into_bytes().into_iter().demojfuscate_byte_stream()
     }
 }
 
 impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
-    fn demojfuscate_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
-        self.bytes().into_iter().demojfuscate_stream()
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
+        self.bytes().into_iter().demojfuscate_byte_stream()
     }
 }
 
-/*
-impl<I> ConstructFromEmoji<DecodeEmojiToBytes<I>, I> for DecodeEmojiToBytes<I>
+// demojfuscate_stream related stuff
+pub struct DemojfuscateIterator<A, I>
 where
-    I: Iterator<Item = u8>
+    A: ConstructFromEmoji<A, I>,
+    I: Iterator<Item = u8>,
 {
-    fn construct_from_emoji(byte_stream : DecodeEmojiToBytes<I>) -> Result<(DecodeEmojiToBytes<I>, DecodeEmojiToBytes<I>), FromEmojiError> {
-        Ok(byte_stream)
+    iter: DecodeEmojiToBytes<I>,
+    past_sequence_start: bool,
+    reached_sequence_end: bool,
+    encountered_error: bool,
+    _phantom: std::marker::PhantomData<A>,
+}
+
+impl<A, I> Iterator for DemojfuscateIterator<A, I>
+where
+    A: ConstructFromEmoji<A, I>,
+    I: Iterator<Item = u8>,
+{
+    type Item = Result<A, FromEmojiError>;
+    fn next(&mut self) -> Option<Result<A, FromEmojiError>> {
+        if self.reached_sequence_end || self.encountered_error {
+            return None;
+        }
+
+        if !self.past_sequence_start {
+            match self.iter.next() {
+                Some(Ok(ByteInSequence::SequenceStart)) => {
+                    self.past_sequence_start = true;
+                }
+                Some(Ok(_)) => {
+                    self.encountered_error = true;
+                    return Some(Err(FromEmojiError::MissingSequenceStart));
+                }
+                Some(Err(err)) => {
+                    self.encountered_error = true;
+                    return Some(Err(err));
+                }
+                None => {
+                    self.encountered_error = true;
+                    return Some(Err(FromEmojiError::NotEnoughEmoji));
+                }
+            }
+        }
+
+        if self.iter.reached_end_of_sequence() {
+            self.iter.next(); // pop off the SequenceEnd value
+            self.reached_sequence_end = true;
+            return None;
+        }
+
+        match A::construct_from_emoji(&mut self.iter) {
+            Ok(value) => return Some(Ok(value)),
+            Err(err) => {
+                self.encountered_error = true;
+                return Some(Err(err));
+            }
+        };
     }
 }
-*/
 
 // implementations
 impl<I> ConstructFromEmoji<(), I> for ()
 where
     I: Iterator<Item = u8>,
 {
-    fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<((), DecodeEmojiToBytes<I>), FromEmojiError> {
-        Ok(((), byte_stream))
+    fn construct_from_emoji(_: &mut DecodeEmojiToBytes<I>) -> Result<(), FromEmojiError> {
+        Ok(())
     }
 }
 
@@ -258,11 +312,11 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(bool, DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<bool, FromEmojiError> {
         match byte_stream.next() {
-            Some(Ok(ByteInSequence::Byte(0))) => Ok((false, byte_stream)),
-            Some(Ok(ByteInSequence::Byte(1))) => Ok((true, byte_stream)),
+            Some(Ok(ByteInSequence::Byte(0))) => Ok(false),
+            Some(Ok(ByteInSequence::Byte(1))) => Ok(true),
             Some(Ok(ByteInSequence::Byte(x))) => Err(FromEmojiError::UnexpectedInput(format!("Received unexpected byte when trying to demojfuscate bool, expected 0 or 1 but received {}", x))),
             Some(Ok(ByteInSequence::SequenceStart)) => Err(FromEmojiError::UnexpectedSequenceStart("When demojfuscating bool".to_string())),
             Some(Ok(ByteInSequence::SequenceEnd)) => Err(FromEmojiError::UnexpectedSequenceEnd),
@@ -277,12 +331,12 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(char, DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<char, FromEmojiError> {
         match <[u8; 4]>::construct_from_emoji(byte_stream) {
             Err(err) => Err(err),
-            Ok((bytes, new_byte_stream)) => match char::from_u32(u32::from_be_bytes(bytes)) {
-                Some(char) => Ok((char, new_byte_stream)),
+            Ok(bytes) => match char::from_u32(u32::from_be_bytes(bytes)) {
+                Some(char) => Ok(char),
                 None => Err(FromEmojiError::UnexpectedInput(format!(
                     "Can't create char from u32: {}",
                     u32::from_be_bytes(bytes)
@@ -296,11 +350,9 @@ impl<I> ConstructFromEmoji<u8, I> for u8
 where
     I: Iterator<Item = u8>,
 {
-    fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(u8, DecodeEmojiToBytes<I>), FromEmojiError> {
+    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<u8, FromEmojiError> {
         match byte_stream.next() {
-            Some(Ok(ByteInSequence::Byte(byte))) => Ok((byte, byte_stream)),
+            Some(Ok(ByteInSequence::Byte(byte))) => Ok(byte),
             Some(Ok(ByteInSequence::SequenceStart)) => Err(
                 FromEmojiError::UnexpectedSequenceStart("When demojfuscating u8".to_string()),
             ),
@@ -316,10 +368,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(u16, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 2]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (u16::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<u16, FromEmojiError> {
+        <[u8; 2]>::construct_from_emoji(byte_stream).map(u16::from_be_bytes)
     }
 }
 
@@ -328,10 +379,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(u32, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 4]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (u32::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<u32, FromEmojiError> {
+        <[u8; 4]>::construct_from_emoji(byte_stream).map(u32::from_be_bytes)
     }
 }
 
@@ -340,10 +390,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(u64, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 8]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (u64::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<u64, FromEmojiError> {
+        <[u8; 8]>::construct_from_emoji(byte_stream).map(u64::from_be_bytes)
     }
 }
 
@@ -352,10 +401,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(u128, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 16]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (u128::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<u128, FromEmojiError> {
+        <[u8; 16]>::construct_from_emoji(byte_stream).map(u128::from_be_bytes)
     }
 }
 
@@ -363,11 +411,8 @@ impl<I> ConstructFromEmoji<i8, I> for i8
 where
     I: Iterator<Item = u8>,
 {
-    fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(i8, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 1]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (i8::from_be_bytes(bytes), new_byte_stream))
+    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<i8, FromEmojiError> {
+        <[u8; 1]>::construct_from_emoji(byte_stream).map(i8::from_be_bytes)
     }
 }
 
@@ -376,10 +421,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(i16, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 2]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (i16::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<i16, FromEmojiError> {
+        <[u8; 2]>::construct_from_emoji(byte_stream).map(i16::from_be_bytes)
     }
 }
 
@@ -388,10 +432,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(i32, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 4]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (i32::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<i32, FromEmojiError> {
+        <[u8; 4]>::construct_from_emoji(byte_stream).map(i32::from_be_bytes)
     }
 }
 
@@ -400,10 +443,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(i64, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 8]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (i64::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<i64, FromEmojiError> {
+        <[u8; 8]>::construct_from_emoji(byte_stream).map(i64::from_be_bytes)
     }
 }
 
@@ -412,10 +454,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(i128, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 16]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (i128::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<i128, FromEmojiError> {
+        <[u8; 16]>::construct_from_emoji(byte_stream).map(i128::from_be_bytes)
     }
 }
 
@@ -424,10 +465,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(f32, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 4]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (f32::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<f32, FromEmojiError> {
+        <[u8; 4]>::construct_from_emoji(byte_stream).map(f32::from_be_bytes)
     }
 }
 
@@ -436,10 +476,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(f64, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 8]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (f64::from_be_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<f64, FromEmojiError> {
+        <[u8; 8]>::construct_from_emoji(byte_stream).map(f64::from_be_bytes)
     }
 }
 
@@ -448,10 +487,9 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(Uuid, DecodeEmojiToBytes<I>), FromEmojiError> {
-        <[u8; 16]>::construct_from_emoji(byte_stream)
-            .map(|(bytes, new_byte_stream)| (Uuid::from_bytes(bytes), new_byte_stream))
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<Uuid, FromEmojiError> {
+        <[u8; 16]>::construct_from_emoji(byte_stream).map(Uuid::from_bytes)
     }
 }
 
@@ -460,8 +498,8 @@ where
     I: Iterator<Item = u8>,
 {
     fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(String, DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<String, FromEmojiError> {
         // verify that first item is SequenceStart
         match byte_stream.next() {
             Some(Ok(ByteInSequence::SequenceStart)) => {}
@@ -498,7 +536,7 @@ where
             Ok(string) => string,
         };
 
-        return Ok((string, byte_stream));
+        return Ok(string);
     }
 }
 
@@ -508,22 +546,21 @@ where
     A: ConstructFromEmoji<A, I>,
 {
     fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<([A; S], DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<[A; S], FromEmojiError> {
         let mut array_vec = ArrayVec::<A, S>::new();
 
         for element_index in 0..array_vec.capacity() {
             match A::construct_from_emoji(byte_stream) {
                 Err(err) => return Err(err),
-                Ok((x, new_byte_stream)) => {
-                    byte_stream = new_byte_stream;
+                Ok(x) => {
                     array_vec.insert(element_index, x);
                 }
             };
         }
 
         return match array_vec.into_inner() {
-            Ok(array) => Ok((array, byte_stream)),
+            Ok(array) => Ok(array),
             Err(_) => Err(FromEmojiError::NotEnoughEmoji), // this should be impossible
         };
     }
@@ -535,8 +572,8 @@ where
     A: ConstructFromEmoji<A, I>,
 {
     fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(Vec<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<Vec<A>, FromEmojiError> {
         match byte_stream.next() {
             Some(Ok(ByteInSequence::SequenceStart)) => {}
             Some(Ok(_)) => return Err(FromEmojiError::MissingSequenceStart),
@@ -549,12 +586,11 @@ where
         loop {
             if byte_stream.reached_end_of_sequence() {
                 byte_stream.next(); // pop off the SequenceEnd value
-                return Ok((vec, byte_stream));
+                return Ok(vec);
             }
 
             match A::construct_from_emoji(byte_stream) {
-                Ok((element, new_byte_stream)) => {
-                    byte_stream = new_byte_stream;
+                Ok(element) => {
                     vec.push(element);
                 }
                 Err(err) => return Err(err),
@@ -569,13 +605,13 @@ where
     A: ConstructFromEmoji<A, I>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<(Option<A>, DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<Option<A>, FromEmojiError> {
         match u8::construct_from_emoji(byte_stream) {
             Err(err) => Err(err),
-            Ok((0, new_byte_stream)) => Ok((None, new_byte_stream)),
-            Ok((1, new_byte_stream)) => A::construct_from_emoji(new_byte_stream).map(|(x, bs)| (Some(x), bs)),
-            Ok((n, _)) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing Option, expected first byte to be 0 for None or 1 for Some, instead got: {}", n)))
+            Ok(0) => Ok(None),
+            Ok(1) => A::construct_from_emoji(byte_stream).map(Some),
+            Ok(n) => Err(FromEmojiError::UnexpectedInput(format!("Error parsing Option, expected first byte to be 0 for None or 1 for Some, instead got: {}", n)))
         }
     }
 }
@@ -587,33 +623,32 @@ where
     B: ConstructFromEmoji<B, I>,
 {
     fn construct_from_emoji(
-        byte_stream_0: DecodeEmojiToBytes<I>,
-    ) -> Result<(Result<A, B>, DecodeEmojiToBytes<I>), FromEmojiError> {
-        let (constructor_discriminator, byte_stream_1) =
-            match u8::construct_from_emoji(byte_stream_0) {
-                Err(err) => return Err(err),
-                Ok((n, byte_stream_1)) => (n, byte_stream_1),
-            };
-
-        let (m_ok_data, byte_stream_2) = match Option::construct_from_emoji(byte_stream_1) {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<Result<A, B>, FromEmojiError> {
+        let constructor_discriminator = match u8::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((x, byte_stream_2)) => (x, byte_stream_2),
+            Ok(n) => n,
         };
 
-        let (m_err_data, byte_stream_3) = match Option::construct_from_emoji(byte_stream_2) {
+        let m_ok_data = match Option::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((x, byte_stream_3)) => (x, byte_stream_3),
+            Ok(x) => x,
+        };
+
+        let m_err_data = match Option::construct_from_emoji(byte_stream) {
+            Err(err) => return Err(err),
+            Ok(x) => x,
         };
 
         return match (constructor_discriminator, m_ok_data, m_err_data) {
             // Ok
             (0, None, None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, no data found when parsing Ok branch".to_string())),
             (0, None, Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, only Err data found when parsing Ok branch".to_string())),
-            (0, Some(ok_data), None) => Ok((Ok(ok_data), byte_stream_3)),
+            (0, Some(ok_data), None) => Ok(Ok(ok_data)),
             (0, Some(_), Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, both Ok and Err data found when parsing Ok branch".to_string())),
             // Err
             (1, None, None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, no data found when parsing Err branch".to_string())),
-            (1, None, Some(err_data)) => Ok((Err(err_data), byte_stream_3)),
+            (1, None, Some(err_data)) => Ok(Err(err_data)),
             (1, Some(_), None) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, only Ok data found when parsing Err branch".to_string())),
             (1, Some(_), Some(_)) => Err(FromEmojiError::UnexpectedInput("Error parsing Result, both Ok and Err data found when parsing Err branch".to_string())),
             // None of the above
@@ -628,11 +663,11 @@ where
     A: ConstructFromEmoji<A, I>,
 {
     fn construct_from_emoji(
-        byte_stream: DecodeEmojiToBytes<I>,
-    ) -> Result<((A,), DecodeEmojiToBytes<I>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<I>,
+    ) -> Result<(A,), FromEmojiError> {
         return match A::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((result, new_byte_stream)) => Ok(((result,), new_byte_stream)),
+            Ok(result) => Ok((result,)),
         };
     }
 }
@@ -647,20 +682,19 @@ macro_rules! tuple_impls {
                 ),+
             {
                 fn construct_from_emoji(
-                    mut byte_stream: DecodeEmojiToBytes<Iter>,
-                ) -> Result<(($($name),+), DecodeEmojiToBytes<Iter>), FromEmojiError> {
+                    byte_stream: &mut DecodeEmojiToBytes<Iter>,
+                ) -> Result<($($name),+), FromEmojiError> {
                     $(
                     let [<$name:lower>] = match $name::construct_from_emoji(byte_stream) {
                         Err(err) => return Err(err),
-                        Ok((result, new_byte_stream)) => {
-                            byte_stream = new_byte_stream;
+                        Ok(result) => {
                             result
                         }
                     };
 
                     )+
 
-                    return Ok((($([<$name:lower>]),+), byte_stream));
+                    return Ok(($([<$name:lower>]),+));
                 }
             }
         }
@@ -681,33 +715,30 @@ where
     C: ConstructFromEmoji<C, Iter>,
 {
     fn construct_from_emoji(
-        mut byte_stream: DecodeEmojiToBytes<Iter>,
-    ) -> Result<((A, B, C), DecodeEmojiToBytes<Iter>), FromEmojiError> {
+        byte_stream: &mut DecodeEmojiToBytes<Iter>,
+    ) -> Result<(A, B, C), FromEmojiError> {
         let a = match A::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((result, new_byte_stream)) => {
-                byte_stream = new_byte_stream;
+            Ok(result) => {
                 result
             }
         };
 
         let b = match B::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((result, new_byte_stream)) => {
-                byte_stream = new_byte_stream;
+            Ok(result) => {
                 result
             }
         };
 
         let c = match C::construct_from_emoji(byte_stream) {
             Err(err) => return Err(err),
-            Ok((result, new_byte_stream)) => {
-                byte_stream = new_byte_stream;
+            Ok(result) => {
                 result
             }
         };
 
-        return Ok(((a, b, c), byte_stream));
+        return Ok((a, b, c));
     }
 }
 */
