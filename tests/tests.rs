@@ -20,7 +20,6 @@ mod tests {
         );
     }
 
-    /*
     #[test]
     fn emojfuscate_tuple() {
         let original_message = (123u8, uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
@@ -33,7 +32,6 @@ mod tests {
             emojified
         );
     }
-    */
 
     #[test]
     fn emojfuscate_derive_construct_from_emoji_unit_struct() {
@@ -163,7 +161,6 @@ mod tests {
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
 
-        /*
         #[test]
         fn emojfuscate_string_tuple(string1 in "\\PC*", string2 in "\\PC*") {
             let original_message = (string1, string2);
@@ -179,7 +176,6 @@ mod tests {
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
-        */
 
         #[test]
         fn emojfuscate_tuple_4(b1 : bool, b2 : bool, b3 : bool, b4 : bool) {

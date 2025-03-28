@@ -368,9 +368,6 @@ impl<'a>
             .emojfuscate_stream()
             .add_start_emoji()
             .add_stop_emoji()
-        /*
-        self.bytes().into_iter().emojfuscate_stream()
-        */
     }
 }
 
