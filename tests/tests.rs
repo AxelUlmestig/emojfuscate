@@ -162,6 +162,14 @@ mod tests {
         }
 
         #[test]
+        fn emojfuscate_single_tuple(string in "\\PC*") {
+            let original_message = (string,);
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
         fn emojfuscate_string_tuple(string1 in "\\PC*", string2 in "\\PC*") {
             let original_message = (string1, string2);
             let emojified = original_message.clone().emojfuscate();
