@@ -23,6 +23,16 @@ where
     }
 }
 
+/// This is the same thing as Emojfuscate but it only applies to Iterators of bytes, it's an
+/// optimization to avoid u8 iterators to wrap each u8 into Once<u8> which happens with the default
+/// implementation of emojfuscate_stream
+pub trait EmojfuscateByteStream<I>
+where
+    I: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_byte_stream(self) -> EncodeBytesAsEmoji<I>;
+}
+
 pub struct EncodeBytesAsEmoji<I>
 where
     I: Iterator<Item = ByteInSequence>,
@@ -197,20 +207,18 @@ fn wrap_byte(b: u8) -> ByteInSequence {
     ByteInSequence::Byte(b)
 }
 
+impl<I: Iterator<Item = u8>> EmojfuscateByteStream<Map<I, fn(u8) -> ByteInSequence>> for I {
+    fn emojfuscate_byte_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
+        EncodeBytesAsEmoji::new(self.map(wrap_byte))
+    }
+}
+
 // implementations
 impl<I: Iterator<Item = ByteInSequence>> Emojfuscate<I> for I {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
         EncodeBytesAsEmoji::new(self)
     }
 }
-
-/*
-impl<I: Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteInSequence>> for I {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
-        EncodeBytesAsEmoji::new(self.map(wrap_byte))
-    }
-}
-*/
 
 impl Emojfuscate<Empty<ByteInSequence>> for () {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Empty<ByteInSequence>> {
@@ -364,8 +372,7 @@ impl<'a>
     > {
         self.bytes()
             .into_iter()
-            .map(wrap_byte as fn(u8) -> ByteInSequence)
-            .emojfuscate_stream()
+            .emojfuscate_byte_stream()
             .add_start_emoji()
             .add_stop_emoji()
     }
@@ -389,24 +396,17 @@ impl
     > {
         self.into_bytes()
             .into_iter()
-            .map(wrap_byte as fn(u8) -> ByteInSequence)
-            .emojfuscate_stream()
+            .emojfuscate_byte_stream()
             .add_start_emoji()
             .add_stop_emoji()
     }
 }
 
-impl
-    Emojfuscate<
-        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteInSequence>, fn(u8) -> Once<ByteInSequence>>,
-    > for Uuid
-{
+impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> for Uuid {
     fn emojfuscate_stream(
         self,
-    ) -> EncodeBytesAsEmoji<
-        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteInSequence>, fn(u8) -> Once<ByteInSequence>>,
-    > {
-        return self.into_bytes().emojfuscate_stream();
+    ) -> EncodeBytesAsEmoji<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> {
+        return self.into_bytes().into_iter().emojfuscate_byte_stream();
     }
 }
 
