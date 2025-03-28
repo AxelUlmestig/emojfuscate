@@ -78,6 +78,53 @@ where
             queued_emoji: self.queued_emoji,
         }
     }
+
+    /// Rust has a philosphy where adding a trait implementation is not supposed to be a breaking
+    /// change. So to avoid breakage from crates adding trait implementations it considers concrete
+    /// types from a crate to have a possible future implementation of all the traits from the same
+    /// crate.
+    ///
+    /// This means that you will get a compiler error if you make a trait implementation for all
+    /// generic values of `I` that implements some trait and then later on make an implementation
+    /// for a concrete type from the same crate. Because if that crate decided to make an
+    /// instance of that trait for that type in the future then there would be conflicting
+    /// implementations of your trait.
+    ///
+    /// This happens in this crate because we want to say that all Iterators I implement
+    /// Emojfuscate as long as the Item iterated over implements Emojfuscate. This should cause
+    /// conflicts because the Iterator trait is from the standard library along with all the basic
+    /// types such as u8, bool etc.
+    ///
+    /// For some reason this problem doesn't arise here. Except for tuples with two or three values
+    /// (not four and up). But luckily we can make the compiler error go away by just wrapping the
+    /// resuling iterator in useless IteratorWrapper layer 🧠
+    pub fn bypass_future_trait_implementation_compiler_error(
+        self,
+    ) -> EncodeBytesAsEmoji<IteratorWrapper<I, ByteInSequence>> {
+        EncodeBytesAsEmoji {
+            iter: IteratorWrapper { iter: self.iter },
+            input_data: self.input_data,
+            defined_bits: self.defined_bits,
+            queued_emoji: self.queued_emoji,
+        }
+    }
+}
+
+pub struct IteratorWrapper<I, A>
+where
+    I: Iterator<Item = A>,
+{
+    iter: I,
+}
+
+impl<I, A> Iterator for IteratorWrapper<I, A>
+where
+    I: Iterator<Item = A>,
+{
+    type Item = A;
+    fn next(&mut self) -> Option<A> {
+        self.iter.next()
+    }
 }
 
 impl<I> Iterator for EncodeBytesAsEmoji<I>
@@ -479,33 +526,16 @@ where
     }
 }
 
-/*
-impl<A, I> Emojfuscate<I> for (A,)
+impl<A, I> Emojfuscate<IteratorWrapper<I, ByteInSequence>> for (A,)
 where
     A: Emojfuscate<I>,
     I: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<I, ByteInSequence>> {
         let (a,) = self;
-        return a.emojfuscate_stream();
-    }
-}
-*/
-
-pub struct IteratorWrapper<I, A>
-where
-    I: Iterator<Item = A>,
-{
-    iter: I,
-}
-
-impl<I, A> Iterator for IteratorWrapper<I, A>
-where
-    I: Iterator<Item = A>,
-{
-    type Item = A;
-    fn next(&mut self) -> Option<A> {
-        self.iter.next()
+        return a
+            .emojfuscate_stream()
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
 
@@ -520,19 +550,15 @@ where
         self,
     ) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>, ByteInSequence>> {
         let (a, b) = self;
-        let encode_bytes_as_emoji = a
+        return a
             .emojfuscate_stream()
-            .chain_emoji_bytes(b.emojfuscate_stream());
-
-        let wrapped = IteratorWrapper {
-            iter: encode_bytes_as_emoji.iter,
-        };
-        return EncodeBytesAsEmoji::new(wrapped);
+            .chain_emoji_bytes(b.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
 
-/*
-impl<A, B, C, IA, IB, IC> Emojfuscate<Chain<Chain<IA, IB>, IC>> for (A, B, C)
+impl<A, B, C, IA, IB, IC> Emojfuscate<IteratorWrapper<Chain<Chain<IA, IB>, IC>, ByteInSequence>>
+    for (A, B, C)
 where
     A: Emojfuscate<IA>,
     B: Emojfuscate<IB>,
@@ -541,15 +567,17 @@ where
     IB: Iterator<Item = ByteInSequence>,
     IC: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<IA, IB>, IC>> {
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<Chain<IA, IB>, IC>, ByteInSequence>> {
         let (a, b, c) = self;
         return a
             .emojfuscate_stream()
             .chain_emoji_bytes(b.emojfuscate_stream())
-            .chain_emoji_bytes(c.emojfuscate_stream());
+            .chain_emoji_bytes(c.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
-*/
 
 impl<A1, A2, A3, A4, I1, I2, I3, I4> Emojfuscate<Chain<Chain<Chain<I1, I2>, I3>, I4>>
     for (A1, A2, A3, A4)
