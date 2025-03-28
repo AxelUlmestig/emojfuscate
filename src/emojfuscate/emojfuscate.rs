@@ -492,22 +492,44 @@ where
 }
 */
 
-/*
-impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
+pub struct IteratorWrapper<I, A>
+where
+    I: Iterator<Item = A>,
+{
+    iter: I,
+}
+
+impl<I, A> Iterator for IteratorWrapper<I, A>
+where
+    I: Iterator<Item = A>,
+{
+    type Item = A;
+    fn next(&mut self) -> Option<A> {
+        self.iter.next()
+    }
+}
+
+impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>, ByteInSequence>> for (A, B)
 where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
     I1: Iterator<Item = ByteInSequence>,
     I2: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>, ByteInSequence>> {
         let (a, b) = self;
-        return a
+        let encode_bytes_as_emoji = a
             .emojfuscate_stream()
             .chain_emoji_bytes(b.emojfuscate_stream());
+
+        let wrapped = IteratorWrapper {
+            iter: encode_bytes_as_emoji.iter,
+        };
+        return EncodeBytesAsEmoji::new(wrapped);
     }
 }
-*/
 
 /*
 impl<A, B, C, IA, IB, IC> Emojfuscate<Chain<Chain<IA, IB>, IC>> for (A, B, C)
