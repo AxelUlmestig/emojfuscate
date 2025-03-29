@@ -121,7 +121,7 @@ where
     /// resuling iterator in useless IteratorWrapper layer 🧠
     pub fn bypass_future_trait_implementation_compiler_error(
         self,
-    ) -> EncodeBytesAsEmoji<IteratorWrapper<I, ByteInSequence>> {
+    ) -> EncodeBytesAsEmoji<IteratorWrapper<I>> {
         EncodeBytesAsEmoji {
             iter: IteratorWrapper { iter: self.iter },
             input_data: self.input_data,
@@ -131,14 +131,14 @@ where
     }
 }
 
-pub struct IteratorWrapper<I, A>
+pub struct IteratorWrapper<I>
 where
-    I: Iterator<Item = A>,
+    I: Iterator,
 {
     iter: I,
 }
 
-impl<I, A> Iterator for IteratorWrapper<I, A>
+impl<I, A> Iterator for IteratorWrapper<I>
 where
     I: Iterator<Item = A>,
 {
@@ -537,12 +537,12 @@ where
     }
 }
 
-impl<A, I> Emojfuscate<IteratorWrapper<I, ByteInSequence>> for (A,)
+impl<A, I> Emojfuscate<IteratorWrapper<I>> for (A,)
 where
     A: Emojfuscate<I>,
     I: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<I, ByteInSequence>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<I>> {
         let (a,) = self;
         return a
             .emojfuscate_stream()
@@ -550,16 +550,14 @@ where
     }
 }
 
-impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>, ByteInSequence>> for (A, B)
+impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>>> for (A, B)
 where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
     I1: Iterator<Item = ByteInSequence>,
     I2: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(
-        self,
-    ) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>, ByteInSequence>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>>> {
         let (a, b) = self;
         return a
             .emojfuscate_stream()
@@ -568,8 +566,7 @@ where
     }
 }
 
-impl<A, B, C, IA, IB, IC> Emojfuscate<IteratorWrapper<Chain<Chain<IA, IB>, IC>, ByteInSequence>>
-    for (A, B, C)
+impl<A, B, C, IA, IB, IC> Emojfuscate<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> for (A, B, C)
 where
     A: Emojfuscate<IA>,
     B: Emojfuscate<IB>,
@@ -578,9 +575,7 @@ where
     IB: Iterator<Item = ByteInSequence>,
     IC: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(
-        self,
-    ) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<Chain<IA, IB>, IC>, ByteInSequence>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> {
         let (a, b, c) = self;
         return a
             .emojfuscate_stream()
