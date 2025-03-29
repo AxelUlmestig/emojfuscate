@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, EmojfuscateByteStream};
+    use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate};
     use proptest::prelude::*;
     use std::iter;
     use std::iter::{Chain, Once};
@@ -55,7 +55,7 @@ mod tests {
         let source = iter::repeat(to_repeat);
 
         let demojfuscated: Result<Vec<u8>, emojfuscate::FromEmojiError> = source
-            .emojfuscate_byte_stream()
+            .emojfuscate_stream()
             .demojfuscate_stream()
             .take(3)
             .collect();
