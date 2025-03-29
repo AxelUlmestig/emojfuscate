@@ -1,5 +1,6 @@
 use arrayvec::ArrayVec;
 use paste::paste;
+use std::iter;
 use std::str;
 use uuid::Uuid;
 
@@ -235,6 +236,25 @@ impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
     fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
         self.bytes().into_iter().demojfuscate_byte_stream()
     }
+}
+
+impl<I: Iterator<Item = char>>
+    IsEmojiRepresentation<
+        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
+    > for I
+{
+    fn demojfuscate_byte_stream(
+        self,
+    ) -> DecodeEmojiToBytes<
+        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
+    > {
+        self.flat_map(char_to_byte_iter as fn(char) -> std::vec::IntoIter<u8>)
+            .demojfuscate_byte_stream()
+    }
+}
+
+fn char_to_byte_iter(c: char) -> std::vec::IntoIter<u8> {
+    c.to_string().into_bytes().into_iter()
 }
 
 // demojfuscate_stream related stuff

@@ -1,7 +1,8 @@
 #[cfg(test)]
 mod tests {
-    use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate};
+    use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, EmojfuscateByteStream};
     use proptest::prelude::*;
+    use std::iter;
     use std::iter::{Chain, Once};
     use uuid::uuid;
 
@@ -46,6 +47,20 @@ mod tests {
             "emojfuscated version: {}",
             emojified
         );
+    }
+
+    #[test]
+    fn emojfuscate_infinite_streams() {
+        let to_repeat: u8 = 0;
+        let source = iter::repeat(to_repeat);
+
+        let demojfuscated: Result<Vec<u8>, emojfuscate::FromEmojiError> = source
+            .emojfuscate_byte_stream()
+            .demojfuscate_stream()
+            .take(3)
+            .collect();
+
+        assert_eq!(demojfuscated, Ok(vec![0, 0, 0]));
     }
 
     proptest! {

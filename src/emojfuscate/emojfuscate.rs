@@ -30,7 +30,18 @@ pub trait EmojfuscateByteStream<I>
 where
     I: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_byte_stream(self) -> EncodeBytesAsEmoji<I>;
+    fn emojfuscate_byte_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>>
+    where
+        Self: Sized,
+    {
+        self.emojfuscate_byte_stream_no_start_or_stop()
+            .add_start_emoji()
+            .add_stop_emoji()
+    }
+
+    fn emojfuscate_byte_stream_no_start_or_stop(self) -> EncodeBytesAsEmoji<I>;
 }
 
 pub struct EncodeBytesAsEmoji<I>
@@ -208,15 +219,23 @@ fn wrap_byte(b: u8) -> ByteInSequence {
 }
 
 impl<I: Iterator<Item = u8>> EmojfuscateByteStream<Map<I, fn(u8) -> ByteInSequence>> for I {
-    fn emojfuscate_byte_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
-        EncodeBytesAsEmoji::new(self.map(wrap_byte))
+    fn emojfuscate_byte_stream_no_start_or_stop(
+        self,
+    ) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
+        EncodeBytesAsEmoji::new(self.map(wrap_byte as fn(u8) -> ByteInSequence))
     }
 }
 
 // implementations
-impl<I: Iterator<Item = ByteInSequence>> Emojfuscate<I> for I {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+impl<I: Iterator<Item = ByteInSequence>>
+    Emojfuscate<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>> for I
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>> {
         EncodeBytesAsEmoji::new(self)
+            .add_start_emoji()
+            .add_stop_emoji()
     }
 }
 
@@ -370,11 +389,7 @@ impl<'a>
             Once<ByteInSequence>,
         >,
     > {
-        self.bytes()
-            .into_iter()
-            .emojfuscate_byte_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
+        self.bytes().into_iter().emojfuscate_byte_stream()
     }
 }
 
@@ -394,11 +409,7 @@ impl
             Once<ByteInSequence>,
         >,
     > {
-        self.into_bytes()
-            .into_iter()
-            .emojfuscate_byte_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
+        self.into_bytes().into_iter().emojfuscate_byte_stream()
     }
 }
 
@@ -406,7 +417,10 @@ impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> fo
     fn emojfuscate_stream(
         self,
     ) -> EncodeBytesAsEmoji<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> {
-        return self.into_bytes().into_iter().emojfuscate_byte_stream();
+        return self
+            .into_bytes()
+            .into_iter()
+            .emojfuscate_byte_stream_no_start_or_stop();
     }
 }
 
@@ -419,9 +433,11 @@ where
     fn emojfuscate_stream(
         self,
     ) -> EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>> {
-        self.into_iter()
-            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
-            .emojfuscate_stream()
+        let iterator = self
+            .into_iter()
+            .flat_map(get_emojfuscate_iter as fn(A) -> IA);
+
+        return EncodeBytesAsEmoji::new(iterator);
     }
 }
 
@@ -472,8 +488,6 @@ where
     > {
         self.flat_map(get_emojfuscate_iter as fn(A) -> IA)
             .emojfuscate_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
     }
 }
 
