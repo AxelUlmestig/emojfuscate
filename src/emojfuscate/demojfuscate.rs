@@ -1,6 +1,5 @@
 use arrayvec::ArrayVec;
 use paste::paste;
-use std::iter;
 use std::str;
 use uuid::Uuid;
 
