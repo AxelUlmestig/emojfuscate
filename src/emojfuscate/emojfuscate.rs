@@ -23,6 +23,27 @@ where
     }
 }
 
+/// This is the same thing as Emojfuscate but it only applies to Iterators of bytes, it's an
+/// optimization to avoid u8 iterators wrapping each u8 into Once<u8> which happens with the
+/// default implementation of emojfuscate_stream
+pub trait EmojfuscateByteStream<I>
+where
+    I: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_byte_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>>
+    where
+        Self: Sized,
+    {
+        self.emojfuscate_byte_stream_no_start_or_stop()
+            .add_start_emoji()
+            .add_stop_emoji()
+    }
+
+    fn emojfuscate_byte_stream_no_start_or_stop(self) -> EncodeBytesAsEmoji<I>;
+}
+
 pub struct EncodeBytesAsEmoji<I>
 where
     I: Iterator<Item = ByteInSequence>,
@@ -77,6 +98,53 @@ where
             defined_bits: self.defined_bits,
             queued_emoji: self.queued_emoji,
         }
+    }
+
+    /// Rust has a philosphy where adding a trait implementation is not supposed to be a breaking
+    /// change. So to avoid breakage from crates adding trait implementations it considers concrete
+    /// types from a crate to have a possible future implementation of all the traits from the same
+    /// crate.
+    ///
+    /// This means that you will get a compiler error if you make a trait implementation for all
+    /// generic values of `I` that implements some trait and then later on make an implementation
+    /// for a concrete type from the same crate. Because if that crate decided to make an
+    /// instance of that trait for that type in the future then there would be conflicting
+    /// implementations of your trait.
+    ///
+    /// This happens in this crate because we want to say that all Iterators I implement
+    /// Emojfuscate as long as the Item iterated over implements Emojfuscate. This should cause
+    /// conflicts because the Iterator trait is from the standard library along with all the basic
+    /// types such as u8, bool etc.
+    ///
+    /// For some reason this problem doesn't arise here. Except for tuples with two or three values
+    /// (not four and up). But luckily we can make the compiler error go away by just wrapping the
+    /// resuling iterator in useless IteratorWrapper layer 🧠
+    pub fn bypass_future_trait_implementation_compiler_error(
+        self,
+    ) -> EncodeBytesAsEmoji<IteratorWrapper<I>> {
+        EncodeBytesAsEmoji {
+            iter: IteratorWrapper { iter: self.iter },
+            input_data: self.input_data,
+            defined_bits: self.defined_bits,
+            queued_emoji: self.queued_emoji,
+        }
+    }
+}
+
+pub struct IteratorWrapper<I>
+where
+    I: Iterator,
+{
+    iter: I,
+}
+
+impl<I, A> Iterator for IteratorWrapper<I>
+where
+    I: Iterator<Item = A>,
+{
+    type Item = A;
+    fn next(&mut self) -> Option<A> {
+        self.iter.next()
     }
 }
 
@@ -150,16 +218,24 @@ fn wrap_byte(b: u8) -> ByteInSequence {
     ByteInSequence::Byte(b)
 }
 
-// implementations
-impl<I: Iterator<Item = ByteInSequence>> Emojfuscate<I> for I {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
-        EncodeBytesAsEmoji::new(self)
+impl<I: Iterator<Item = u8>> EmojfuscateByteStream<Map<I, fn(u8) -> ByteInSequence>> for I {
+    fn emojfuscate_byte_stream_no_start_or_stop(
+        self,
+    ) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
+        EncodeBytesAsEmoji::new(self.map(wrap_byte as fn(u8) -> ByteInSequence))
     }
 }
 
-impl<I: Iterator<Item = u8>> Emojfuscate<Map<I, fn(u8) -> ByteInSequence>> for I {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
-        EncodeBytesAsEmoji::new(self.map(wrap_byte))
+// implementations
+impl<I: Iterator<Item = ByteInSequence>>
+    Emojfuscate<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>> for I
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>> {
+        EncodeBytesAsEmoji::new(self)
+            .add_start_emoji()
+            .add_stop_emoji()
     }
 }
 
@@ -313,11 +389,7 @@ impl<'a>
             Once<ByteInSequence>,
         >,
     > {
-        self.bytes()
-            .into_iter()
-            .emojfuscate_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
+        self.bytes().into_iter().emojfuscate_byte_stream()
     }
 }
 
@@ -337,25 +409,18 @@ impl
             Once<ByteInSequence>,
         >,
     > {
-        self.into_bytes()
-            .into_iter()
-            .emojfuscate_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
+        self.into_bytes().into_iter().emojfuscate_byte_stream()
     }
 }
 
-impl
-    Emojfuscate<
-        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteInSequence>, fn(u8) -> Once<ByteInSequence>>,
-    > for Uuid
-{
+impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> for Uuid {
     fn emojfuscate_stream(
         self,
-    ) -> EncodeBytesAsEmoji<
-        FlatMap<std::array::IntoIter<u8, 16>, Once<ByteInSequence>, fn(u8) -> Once<ByteInSequence>>,
-    > {
-        return self.into_bytes().emojfuscate_stream();
+    ) -> EncodeBytesAsEmoji<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> {
+        return self
+            .into_bytes()
+            .into_iter()
+            .emojfuscate_byte_stream_no_start_or_stop();
     }
 }
 
@@ -368,9 +433,11 @@ where
     fn emojfuscate_stream(
         self,
     ) -> EncodeBytesAsEmoji<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>> {
-        self.into_iter()
-            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
-            .emojfuscate_stream()
+        let iterator = self
+            .into_iter()
+            .flat_map(get_emojfuscate_iter as fn(A) -> IA);
+
+        return EncodeBytesAsEmoji::new(iterator);
     }
 }
 
@@ -401,11 +468,26 @@ where
             Once<ByteInSequence>,
         >,
     > {
-        self.into_iter()
-            .flat_map(get_emojfuscate_iter as fn(A) -> IA)
+        self.into_iter().emojfuscate_stream()
+    }
+}
+
+impl<I, A, IA>
+    Emojfuscate<
+        Chain<Chain<Once<ByteInSequence>, FlatMap<I, IA, fn(A) -> IA>>, Once<ByteInSequence>>,
+    > for I
+where
+    I: Iterator<Item = A>,
+    A: Emojfuscate<IA>,
+    IA: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<Chain<Once<ByteInSequence>, FlatMap<I, IA, fn(A) -> IA>>, Once<ByteInSequence>>,
+    > {
+        self.flat_map(get_emojfuscate_iter as fn(A) -> IA)
             .emojfuscate_stream()
-            .add_start_emoji()
-            .add_stop_emoji()
     }
 }
 
@@ -455,35 +537,36 @@ where
     }
 }
 
-/*
-impl<A, I> Emojfuscate<I> for (A,)
+impl<A, I> Emojfuscate<IteratorWrapper<I>> for (A,)
 where
     A: Emojfuscate<I>,
     I: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<I> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<I>> {
         let (a,) = self;
-        return a.emojfuscate_stream();
+        return a
+            .emojfuscate_stream()
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
-*/
 
-impl<A, B, I1, I2> Emojfuscate<Chain<I1, I2>> for (A, B)
+impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>>> for (A, B)
 where
     A: Emojfuscate<I1>,
     B: Emojfuscate<I2>,
     I1: Iterator<Item = ByteInSequence>,
     I2: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<I1, I2>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>>> {
         let (a, b) = self;
         return a
             .emojfuscate_stream()
-            .chain_emoji_bytes(b.emojfuscate_stream());
+            .chain_emoji_bytes(b.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
 
-impl<A, B, C, IA, IB, IC> Emojfuscate<Chain<Chain<IA, IB>, IC>> for (A, B, C)
+impl<A, B, C, IA, IB, IC> Emojfuscate<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> for (A, B, C)
 where
     A: Emojfuscate<IA>,
     B: Emojfuscate<IB>,
@@ -492,12 +575,13 @@ where
     IB: Iterator<Item = ByteInSequence>,
     IC: Iterator<Item = ByteInSequence>,
 {
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<IA, IB>, IC>> {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> {
         let (a, b, c) = self;
         return a
             .emojfuscate_stream()
             .chain_emoji_bytes(b.emojfuscate_stream())
-            .chain_emoji_bytes(c.emojfuscate_stream());
+            .chain_emoji_bytes(c.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
     }
 }
 

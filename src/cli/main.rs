@@ -9,7 +9,8 @@ use std::str;
 use uuid::Uuid;
 
 use emojfuscate::{
-    ByteInSequence, Demojfuscate, Emojfuscate, FromEmojiError, IsEmojiRepresentation,
+    ByteInSequence, Demojfuscate, Emojfuscate, EmojfuscateByteStream, FromEmojiError,
+    IsEmojiRepresentation,
 };
 mod hex_stream;
 
@@ -102,7 +103,7 @@ fn main() -> ExitCode {
                 },
                 DataType::Text => match input.as_str() {
                     "-" => {
-                        for emoji in unwrapped_std_in.emojfuscate_stream() {
+                        for emoji in unwrapped_std_in.emojfuscate_byte_stream() {
                             stream.write(emoji.to_string().as_bytes()).unwrap();
                         }
                     }

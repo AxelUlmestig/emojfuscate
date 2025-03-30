@@ -6,8 +6,7 @@ like `{`, `[` and `<`. This is friendly to robots, not humans. Emojfuscate will
 encode your data using emoji, i.e. pure human emotion.
 
 As a library Emojfuscate promises to bring concrete business value to your
-project by virtue of it being written in Rust and being _smolderingly quick_
-(trademark pending).
+project by virtue of it being written in Rust and being _smolderingly quick_.
 
 Let's see an example.
 
@@ -37,29 +36,33 @@ assert_eq!(deserialized_person, Ok(original_person));
 ### Laziness
 
 To further embrace human properties, Emojfuscate is as lazy as
-possible. Any iterator of `u8` can be turned into a lazy iterator of emoji.
+possible. Any iterator, whose elements can be emojfuscated, can be turned into
+a lazy iterator of emoji.
+
+Any lazy stream of emoji can be converted into a lazy stream of whatever type
+you want as long as it can be demojfuscated. Emojfuscate can cover all your
+emojfuscating needs in constant memory.
 
 ```rust
 use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
 
-for emoji in "hunter2".bytes().emojfuscate_stream() {
-    println!("{}", emoji);
-}
+let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
+
+let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
+    .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
+    .demojfuscate_stream() // infinite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+    .take(3) // finite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+    .collect(); // Result<Vec<String>, FromEmojiError>
+
+assert_eq!(
+    demojfuscated,
+    Ok(vec![
+        "hello".to_string(),
+        "hello".to_string(),
+        "hello".to_string()
+    ])
+);
 ```
-
-Similarly you can demojfuscate an iterator of (emoji) bytes into an iterator of
-demojfuscated bytes:
-```rust
-use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
-
-for byte in "🐠🥏👛👿🌴📰🌨".bytes().demojfuscate_stream() {
-    println!("{}", byte as char);
-}
-```
-
-Note that the `.bytes()` method call isn't necessary in any of the two above
-examples, it was added to demonstrate that you can convert iterators to other
-iterators.
 
 ### How it works
 

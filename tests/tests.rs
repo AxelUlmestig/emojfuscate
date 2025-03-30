@@ -2,6 +2,7 @@
 mod tests {
     use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate};
     use proptest::prelude::*;
+    use std::iter;
     use std::iter::{Chain, Once};
     use uuid::uuid;
 
@@ -45,6 +46,26 @@ mod tests {
             Ok(UnitStruct),
             "emojfuscated version: {}",
             emojified
+        );
+    }
+
+    #[test]
+    fn emojfuscate_infinite_streams() {
+        let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
+
+        let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
+            .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
+            .demojfuscate_stream() // infinite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+            .take(3) // finite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+            .collect(); // Result<Vec<String>, FromEmojiError>
+
+        assert_eq!(
+            demojfuscated,
+            Ok(vec![
+                "hello".to_string(),
+                "hello".to_string(),
+                "hello".to_string()
+            ])
         );
     }
 
@@ -156,6 +177,14 @@ mod tests {
 
         #[test]
         fn emojfuscate_f64(original_message : f64) {
+            let emojified = original_message.clone().emojfuscate();
+            let roundtrip_message = emojified.clone().demojfuscate();
+            assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
+        }
+
+        #[test]
+        fn emojfuscate_single_tuple(string in "\\PC*") {
+            let original_message = (string,);
             let emojified = original_message.clone().emojfuscate();
             let roundtrip_message = emojified.clone().demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
