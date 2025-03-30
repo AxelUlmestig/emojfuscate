@@ -11,7 +11,7 @@ project by virtue of it being written in Rust and being _smolderingly quick_.
 Let's see an example.
 
 ```rust
-use emojfuscate::{ConstructFromEmojiStream, Demojfuscate, Emojfuscate, FromEmojiError};
+use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate};
 
 #[derive(Emojfuscate, ConstructFromEmoji, Clone, Debug, PartialEq)]
 struct Person {
@@ -46,7 +46,7 @@ emojfuscating needs in constant memory.
 ```rust
 use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
 
-let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
+let source = std::iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
 
 let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
     .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>

@@ -81,7 +81,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     });
 
                 let iterator_chain = iterator_names.clone().reduce(|chain, element| {
-                    quote! {Chain<#chain, #element>}
+                    quote! {std::iter::Chain<#chain, #element>}
                 });
 
                 let generics = input
@@ -142,7 +142,7 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                 );
 
                 let iterator_chain = iterator_names.clone().reduce(|chain, element| {
-                    quote! {Chain<#chain, #element>}
+                    quote! {std::iter::Chain<#chain, #element>}
                 });
 
                 let generics = input
@@ -448,10 +448,10 @@ pub fn derive_emojfuscate(raw_input: proc_macro::TokenStream) -> proc_macro::Tok
                     quote! {#ident}
                 });
 
-            let iterator_chain_type = once(quote! {Once<emojfuscate::ByteInSequence>})
+            let iterator_chain_type = once(quote! {std::iter::Once<emojfuscate::ByteInSequence>})
                 .chain(iterator_names.clone())
                 .reduce(|chain, element| {
-                    quote! {Chain<#chain, #element>}
+                    quote! {std::iter::Chain<#chain, #element>}
                 });
 
             let where_clause = match trait_constraints.peek() {

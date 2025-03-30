@@ -2,14 +2,11 @@
 mod tests {
     use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate};
     use proptest::prelude::*;
-    use std::iter;
-    use std::iter::{Chain, Once};
-    use uuid::uuid;
 
     // there's no Arbitrary instance for Uuid :(
     #[test]
     fn emojfuscate_uuid() {
-        let original_message = uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8");
+        let original_message = uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8");
         // let original_message : Uuid = Uuid::new_v4();
         let emojified = original_message.clone().emojfuscate();
         let roundtrip_message = emojified.clone().demojfuscate();
@@ -23,7 +20,7 @@ mod tests {
 
     #[test]
     fn emojfuscate_tuple() {
-        let original_message = (123u8, uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
+        let original_message = (123u8, uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
         let emojified = original_message.clone().emojfuscate();
         let roundtrip_message = emojified.clone().demojfuscate();
         assert_eq!(
@@ -51,7 +48,7 @@ mod tests {
 
     #[test]
     fn emojfuscate_infinite_streams() {
-        let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
+        let source = std::iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
 
         let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
             .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
