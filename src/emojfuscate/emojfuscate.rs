@@ -24,8 +24,8 @@ where
 }
 
 /// This is the same thing as Emojfuscate but it only applies to Iterators of bytes, it's an
-/// optimization to avoid u8 iterators to wrap each u8 into Once<u8> which happens with the default
-/// implementation of emojfuscate_stream
+/// optimization to avoid u8 iterators wrapping each u8 into Once<u8> which happens with the
+/// default implementation of emojfuscate_stream
 pub trait EmojfuscateByteStream<I>
 where
     I: Iterator<Item = ByteInSequence>,

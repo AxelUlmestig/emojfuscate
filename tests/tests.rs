@@ -51,16 +51,22 @@ mod tests {
 
     #[test]
     fn emojfuscate_infinite_streams() {
-        let to_repeat: u8 = 0;
-        let source = iter::repeat(to_repeat);
+        let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
 
-        let demojfuscated: Result<Vec<u8>, emojfuscate::FromEmojiError> = source
-            .emojfuscate_stream()
-            .demojfuscate_stream()
-            .take(3)
-            .collect();
+        let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
+            .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
+            .demojfuscate_stream() // infinite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+            .take(3) // finite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+            .collect(); // Result<Vec<String>, FromEmojiError>
 
-        assert_eq!(demojfuscated, Ok(vec![0, 0, 0]));
+        assert_eq!(
+            demojfuscated,
+            Ok(vec![
+                "hello".to_string(),
+                "hello".to_string(),
+                "hello".to_string()
+            ])
+        );
     }
 
     proptest! {

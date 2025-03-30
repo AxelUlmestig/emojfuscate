@@ -6,8 +6,7 @@ like `{`, `[` and `<`. This is friendly to robots, not humans. Emojfuscate will
 encode your data using emoji, i.e. pure human emotion.
 
 As a library Emojfuscate promises to bring concrete business value to your
-project by virtue of it being written in Rust and being _smolderingly quick_
-(trademark pending).
+project by virtue of it being written in Rust and being _smolderingly quick_.
 
 Let's see an example.
 
@@ -42,19 +41,22 @@ possible. Any iterator of `u8` can be turned into a lazy iterator of emoji.
 ```rust
 use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
 
-for emoji in "hunter2".bytes().emojfuscate_stream() {
-    println!("{}", emoji);
-}
-```
+let source = iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
 
-Similarly you can demojfuscate an iterator of (emoji) bytes into an iterator of
-demojfuscated bytes:
-```rust
-use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
+let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
+    .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
+    .demojfuscate_stream() // infinite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+    .take(3) // finite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
+    .collect(); // Result<Vec<String>, FromEmojiError>
 
-for byte in "🐠🥏👛👿🌴📰🌨".bytes().demojfuscate_stream() {
-    println!("{}", byte as char);
-}
+assert_eq!(
+    demojfuscated,
+    Ok(vec![
+        "hello".to_string(),
+        "hello".to_string(),
+        "hello".to_string()
+    ])
+);
 ```
 
 Note that the `.bytes()` method call isn't necessary in any of the two above
