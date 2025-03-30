@@ -36,7 +36,12 @@ assert_eq!(deserialized_person, Ok(original_person));
 ### Laziness
 
 To further embrace human properties, Emojfuscate is as lazy as
-possible. Any iterator of `u8` can be turned into a lazy iterator of emoji.
+possible. Any iterator, whose elements can be emojfuscated, can be turned into
+a lazy iterator of emoji.
+
+Any lazy stream of emoji can be converted into a lazy stream of whatever type
+you want as long as it can be demojfuscated. Emojfuscate can cover all your
+emojfuscating needs in constant memory.
 
 ```rust
 use emojfuscate::{ConstructFromEmoji, Demojfuscate, Emojfuscate, ConstructFromEmojiStream};
@@ -58,10 +63,6 @@ assert_eq!(
     ])
 );
 ```
-
-Note that the `.bytes()` method call isn't necessary in any of the two above
-examples, it was added to demonstrate that you can convert iterators to other
-iterators.
 
 ### How it works
 
