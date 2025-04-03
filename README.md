@@ -85,7 +85,7 @@ Every 10 bits will be mapped to one emoji
 00000001 00000010 00000011 00000100 00000101
 ```
 
-_But what if the number bits are not divisible by 10?_
+_But what if the number bits is not divisible by 10?_
 
 If we have a tuple with only two `u8`
 ```rust
