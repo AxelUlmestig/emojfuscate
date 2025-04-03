@@ -1,4 +1,5 @@
 use core::array::IntoIter;
+use paste::paste;
 use std::collections::VecDeque;
 use std::iter::{empty, once, Chain, Empty, FlatMap, Flatten, Map, Once};
 use std::vec::Vec;
@@ -585,82 +586,68 @@ where
     }
 }
 
-impl<A1, A2, A3, A4, I1, I2, I3, I4> Emojfuscate<Chain<Chain<Chain<I1, I2>, I3>, I4>>
-    for (A1, A2, A3, A4)
-where
-    A1: Emojfuscate<I1>,
-    A2: Emojfuscate<I2>,
-    A3: Emojfuscate<I3>,
-    A4: Emojfuscate<I4>,
-    I1: Iterator<Item = ByteInSequence>,
-    I2: Iterator<Item = ByteInSequence>,
-    I3: Iterator<Item = ByteInSequence>,
-    I4: Iterator<Item = ByteInSequence>,
-{
-    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Chain<Chain<Chain<I1, I2>, I3>, I4>> {
-        let (a1, a2, a3, a4) = self;
-        return a1
-            .emojfuscate_stream()
-            .chain_emoji_bytes(a2.emojfuscate_stream())
-            .chain_emoji_bytes(a3.emojfuscate_stream())
-            .chain_emoji_bytes(a4.emojfuscate_stream());
+// Macro that takes produces the chain type signature
+// ```
+// chain_type!(I1 I2 I3)
+// ```
+// should produce
+// ```
+// Chain<Chain<I1, I2>, I3>
+// Convert space-separated ids to comma-separated and reverse
+macro_rules! chain_type {
+    ($e:ty;) => { $e };
+    ($e:ty; $t:ident $($ts:ident)*) => {
+        chain_type!(Chain<$e, $t>; $($ts)*)
+    };
+    ($t:ident $($ts:ident)*) => {
+        chain_type!($t; $($ts)*)
+    };
+}
+
+macro_rules! impl_emojfuscate_for_tuple {
+    ($first_type:ident $first_iter:ident, $($type:ident $iter:ident),+) => {
+        paste! {
+            impl<$first_type, $($type),+, $first_iter, $($iter),+>
+                Emojfuscate<chain_type!($first_iter $($iter)+)>
+                for ($first_type, $($type),+)
+            where
+                $first_type: Emojfuscate<$first_iter>,
+                $($type: Emojfuscate<$iter>),+,
+                $first_iter: Iterator<Item = ByteInSequence>,
+                $($iter: Iterator<Item = ByteInSequence>),+
+            {
+
+                fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<chain_type!($first_iter $($iter)+)> {
+                    let ([<$first_type:lower>], $([<$type:lower>]),+) = self;
+
+                    return [<$first_type:lower>].emojfuscate_stream()
+                    $(.chain_emoji_bytes([<$type:lower>].emojfuscate_stream()))+
+                    ;
+                }
+            }
+        }
     }
 }
 
-impl<A1, A2, A3, A4, A5, I1, I2, I3, I4, I5>
-    Emojfuscate<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>> for (A1, A2, A3, A4, A5)
-where
-    A1: Emojfuscate<I1>,
-    A2: Emojfuscate<I2>,
-    A3: Emojfuscate<I3>,
-    A4: Emojfuscate<I4>,
-    A5: Emojfuscate<I5>,
-    I1: Iterator<Item = ByteInSequence>,
-    I2: Iterator<Item = ByteInSequence>,
-    I3: Iterator<Item = ByteInSequence>,
-    I4: Iterator<Item = ByteInSequence>,
-    I5: Iterator<Item = ByteInSequence>,
-{
-    fn emojfuscate_stream(
-        self,
-    ) -> EncodeBytesAsEmoji<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>> {
-        let (a1, a2, a3, a4, a5) = self;
-        return a1
-            .emojfuscate_stream()
-            .chain_emoji_bytes(a2.emojfuscate_stream())
-            .chain_emoji_bytes(a3.emojfuscate_stream())
-            .chain_emoji_bytes(a4.emojfuscate_stream())
-            .chain_emoji_bytes(a5.emojfuscate_stream());
-    }
-}
-
-impl<A1, A2, A3, A4, A5, A6, I1, I2, I3, I4, I5, I6>
-    Emojfuscate<Chain<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>, I6>>
-    for (A1, A2, A3, A4, A5, A6)
-where
-    A1: Emojfuscate<I1>,
-    A2: Emojfuscate<I2>,
-    A3: Emojfuscate<I3>,
-    A4: Emojfuscate<I4>,
-    A5: Emojfuscate<I5>,
-    A6: Emojfuscate<I6>,
-    I1: Iterator<Item = ByteInSequence>,
-    I2: Iterator<Item = ByteInSequence>,
-    I3: Iterator<Item = ByteInSequence>,
-    I4: Iterator<Item = ByteInSequence>,
-    I5: Iterator<Item = ByteInSequence>,
-    I6: Iterator<Item = ByteInSequence>,
-{
-    fn emojfuscate_stream(
-        self,
-    ) -> EncodeBytesAsEmoji<Chain<Chain<Chain<Chain<Chain<I1, I2>, I3>, I4>, I5>, I6>> {
-        let (a1, a2, a3, a4, a5, a6) = self;
-        return a1
-            .emojfuscate_stream()
-            .chain_emoji_bytes(a2.emojfuscate_stream())
-            .chain_emoji_bytes(a3.emojfuscate_stream())
-            .chain_emoji_bytes(a4.emojfuscate_stream())
-            .chain_emoji_bytes(a5.emojfuscate_stream())
-            .chain_emoji_bytes(a6.emojfuscate_stream());
-    }
-}
+// Implementations for tuples up to 24 elements
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23);
+impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23, A24 I24);
