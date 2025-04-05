@@ -10,4 +10,4 @@ pub use demojfuscate::{
     ConstructFromEmoji, DecodeEmojiToBytes, Demojfuscate, FromEmojiError, IsEmojiRepresentation,
 };
 pub use emojfuscate::{Emojfuscate, EmojfuscateByteStream, EncodeBytesAsEmoji};
-pub use emojfuscate_proc_macro::*;
+pub use emojfuscate_derive::*;

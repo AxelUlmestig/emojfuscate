@@ -2,6 +2,13 @@
 name = "emojfuscate"
 version = "0.1.0"
 edition = "2021"
+license-file = "LICENSE"
+description = "Tools for turning any data into emoji and back again"
+readme = "README.md"
+homepage = "https://github.com/AxelUlmestig/emojfuscate"
+repository = "https://github.com/AxelUlmestig/emojfuscate"
+keywords = ["emoji", "serialization", "stream", "lazy", "data"]
+categories = ["encoding"]
 
 [lib]
 name = "emojfuscate"
@@ -23,6 +30,8 @@ hex = "0.4.3"
 uuid = "1.8.0"
 quote = "1.0.36"
 syn = "2.0.71"
-emojfuscate_proc_macro = { path = "emojfuscate_proc_macro" }
 paste = "1.0.15"
 lazy_static = "1.5.0"
+
+# emojfuscate_derive = { path = "emojfuscate_derive" }
+emojfuscate_derive = "0.1.0"
