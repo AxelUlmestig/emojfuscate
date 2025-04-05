@@ -1,3 +1,9 @@
+use super::constants::{
+    usize_to_emoji, ByteInSequence, BITS_IN_A_BYTE, BITS_PER_EMOJI, MAX_EMOJI_VALUE,
+    START_EMOJI_VALUE, STOP_EMOJI_VALUE,
+};
+
+use crate::util::iterator_wrapper::IteratorWrapper;
 use core::array::IntoIter;
 use paste::paste;
 use std::collections::VecDeque;
@@ -5,11 +11,12 @@ use std::iter::{empty, once, Chain, Empty, FlatMap, Flatten, Map, Once};
 use std::vec::Vec;
 use uuid::Uuid;
 
-use super::constants::{
-    usize_to_emoji, ByteInSequence, BITS_IN_A_BYTE, BITS_PER_EMOJI, MAX_EMOJI_VALUE,
-    START_EMOJI_VALUE, STOP_EMOJI_VALUE,
-};
-
+/// A trait reprenting things that can be encoded as emoji, either as a lazy stream of bytes or
+/// strictly into a String.
+///
+/// For the most part you shouldn't need to make your own implementations of this. Most types in
+/// the standard library already has an implementation and implementations can be derived for your
+/// custom types using the derive macro.
 pub trait Emojfuscate<I>
 where
     I: Iterator<Item = ByteInSequence>,
@@ -45,6 +52,8 @@ where
     fn emojfuscate_byte_stream_no_start_or_stop(self) -> EncodeBytesAsEmoji<I>;
 }
 
+/// This is a representation of a stream of data that is being converted into emoji. Calling
+/// `emojfuscate_stream` on something
 pub struct EncodeBytesAsEmoji<I>
 where
     I: Iterator<Item = ByteInSequence>,
@@ -68,6 +77,12 @@ where
         }
     }
 
+    /// When types have a size that is unknown at compile time it can be come ambiguous where one
+    /// ends and one starts. E.g. if the tuple `("hello","world")` was just a series of bytes, how
+    /// could we tell it apart from `("helloworld","")`?
+    ///
+    /// This function along with add_stop_emoji adds special emoji that signify the start and stop
+    /// of a sequence of data whose length is unknown at compile time.
     pub fn add_start_emoji(self) -> EncodeBytesAsEmoji<Chain<Once<ByteInSequence>, I>> {
         EncodeBytesAsEmoji {
             iter: once(ByteInSequence::SequenceStart).chain(self.iter),
@@ -86,6 +101,9 @@ where
         }
     }
 
+    /// This is used to combine multiple streams of emoji into one. E.g. the Emojfuscate
+    /// implementation for `(A, B)` for is just calling `emojfuscate_stream` on the two values in
+    /// the tuple and then combining them:
     pub fn chain_emoji_bytes<I2>(
         self,
         other: EncodeBytesAsEmoji<I2>,
@@ -129,23 +147,6 @@ where
             defined_bits: self.defined_bits,
             queued_emoji: self.queued_emoji,
         }
-    }
-}
-
-pub struct IteratorWrapper<I>
-where
-    I: Iterator,
-{
-    iter: I,
-}
-
-impl<I, A> Iterator for IteratorWrapper<I>
-where
-    I: Iterator<Item = A>,
-{
-    type Item = A;
-    fn next(&mut self) -> Option<A> {
-        self.iter.next()
     }
 }
 
@@ -215,19 +216,14 @@ where
     }
 }
 
-fn wrap_byte(b: u8) -> ByteInSequence {
-    ByteInSequence::Byte(b)
-}
-
 impl<I: Iterator<Item = u8>> EmojfuscateByteStream<Map<I, fn(u8) -> ByteInSequence>> for I {
     fn emojfuscate_byte_stream_no_start_or_stop(
         self,
     ) -> EncodeBytesAsEmoji<Map<I, fn(u8) -> ByteInSequence>> {
-        EncodeBytesAsEmoji::new(self.map(wrap_byte as fn(u8) -> ByteInSequence))
+        EncodeBytesAsEmoji::new(self.map(ByteInSequence::Byte as fn(u8) -> ByteInSequence))
     }
 }
 
-// implementations
 impl<I: Iterator<Item = ByteInSequence>>
     Emojfuscate<Chain<Chain<Once<ByteInSequence>, I>, Once<ByteInSequence>>> for I
 {

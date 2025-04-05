@@ -26,9 +26,12 @@ let original_person = Person {
     is_cool: true,
 };
 
-// ❣😋🥫🐭💴📜😆
 let emojified = original_person.clone().emojfuscate();
-let deserialized_person = emojified.clone().demojfuscate();
+
+// emojified: 💟📰🤩💴🎅🧶🐃🏷😀💵
+println!("emojified: {}", emojified.clone());
+
+let deserialized_person = emojified.demojfuscate();
 
 assert_eq!(deserialized_person, Ok(original_person));
 ```
@@ -108,3 +111,16 @@ impossible to be offset by an odd number since we're only dealing with an
 integer number of bytes).
 
 So `(1u8, 2u8)` will be emojfuscated into 😆📰🫣.
+
+### Limitations
+
+The derive macro for Emojfuscate and ConstructFromEmoji for enums currently
+rely on representing the fields as tuples. At the moment Emojfuscate and
+ConstructFromEmoji are only implemented for tuples up to 24 elements. So you
+can't derive instances for enums where any of the constructors has more than 24
+fields.
+
+Luckily we have nifty macros for making tuple instances for both Emojfuscate
+and ConstructFromEmoji, so if you need more fields you can easily make a PR
+and just call the respective macros a few extra times until your needs are
+satisfied.

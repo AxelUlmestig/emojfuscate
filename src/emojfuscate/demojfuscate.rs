@@ -8,7 +8,63 @@ use super::constants::{
     START_EMOJI_VALUE, STOP_EMOJI_VALUE,
 };
 
-// fundamental traits
+/// A trait representing some source of emoji data. This abstraction let's us use both Strings and
+/// streams of bytes when demojfuscating data
+pub trait IsEmojiRepresentation<I>
+where
+    I: Iterator<Item = u8>,
+{
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I>;
+}
+
+impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I> {
+        DecodeEmojiToBytes::new(self)
+    }
+}
+
+impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
+        self.into_bytes().into_iter().demojfuscate_byte_stream()
+    }
+}
+
+impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
+        self.bytes().into_iter().demojfuscate_byte_stream()
+    }
+}
+
+impl<I: Iterator<Item = char>>
+    IsEmojiRepresentation<
+        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
+    > for I
+{
+    fn demojfuscate_byte_stream(
+        self,
+    ) -> DecodeEmojiToBytes<
+        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
+    > {
+        // this feels awfully inefficient, is there a better way to do it?
+        self.flat_map(
+            (|c| c.to_string().into_bytes().into_iter()) as fn(char) -> std::vec::IntoIter<u8>,
+        )
+        .demojfuscate_byte_stream()
+    }
+}
+
+/// A trait representing things that can be constructed from Emoji
+pub trait ConstructFromEmoji<A, I>
+where
+    I: Iterator<Item = u8>,
+{
+    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError>
+    where
+        Self: Sized;
+}
+
+/// Once you have something that can be constructed from emoji and a source of emoji then you can
+/// try to demojfuscate the data
 pub trait Demojfuscate<A, I>
 where
     Self: IsEmojiRepresentation<I>,
@@ -22,20 +78,31 @@ where
         Self: Sized;
 }
 
-pub trait IsEmojiRepresentation<I>
+impl<A, I, X> Demojfuscate<A, I> for X
 where
+    Self: IsEmojiRepresentation<I>,
+    A: ConstructFromEmoji<A, I>,
     I: Iterator<Item = u8>,
 {
-    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I>;
-}
+    /// Produce a lazy stream `Iterator<Item = Result<A, FromEmojiError>` from which you can keep
+    /// taking values until the stream ends or you are satisfied.
+    fn demojfuscate_stream(self) -> DemojfuscateIterator<A, I> {
+        DemojfuscateIterator {
+            iter: self.demojfuscate_byte_stream(),
+            past_sequence_start: false,
+            reached_sequence_end: false,
+            encountered_error: false,
+            _phantom: std::marker::PhantomData,
+        }
+    }
 
-pub trait ConstructFromEmoji<A, I>
-where
-    I: Iterator<Item = u8>,
-{
-    fn construct_from_emoji(byte_stream: &mut DecodeEmojiToBytes<I>) -> Result<A, FromEmojiError>
+    /// Try to construct a value from a source of emoji
+    fn demojfuscate(self) -> Result<A, FromEmojiError>
     where
-        Self: Sized;
+        Self: Sized,
+    {
+        A::construct_from_emoji(&mut self.demojfuscate_byte_stream())
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -49,6 +116,7 @@ pub enum FromEmojiError {
     UnexpectedSequenceEnd,
 }
 
+/// This holds an iterator that produces bytes that are interpreted as UTF-8 encoded emoji
 pub struct DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>,
@@ -74,7 +142,8 @@ where
         }
     }
 
-    // If I were a better rustacean I would have written an implementation of `peek`, Alas...
+    /// If I were a more competent rustacean I would have written an implementation of `peek`,
+    /// Alas...
     pub fn reached_end_of_sequence(&mut self) -> bool {
         match &self.peeked_at {
             Some(Some(Ok(ByteInSequence::SequenceEnd))) => {
@@ -99,7 +168,6 @@ where
     }
 }
 
-// implementations
 impl<I> Iterator for DecodeEmojiToBytes<I>
 where
     I: Iterator<Item = u8>,
@@ -195,68 +263,7 @@ where
     }
 }
 
-impl<A, B, I> Demojfuscate<B, I> for A
-where
-    Self: IsEmojiRepresentation<I>,
-    B: ConstructFromEmoji<B, I>,
-    I: Iterator<Item = u8>,
-{
-    fn demojfuscate_stream(self) -> DemojfuscateIterator<B, I> {
-        DemojfuscateIterator {
-            iter: self.demojfuscate_byte_stream(),
-            past_sequence_start: false,
-            reached_sequence_end: false,
-            encountered_error: false,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    fn demojfuscate(self) -> Result<B, FromEmojiError>
-    where
-        Self: Sized,
-    {
-        B::construct_from_emoji(&mut self.demojfuscate_byte_stream())
-    }
-}
-
-impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
-    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I> {
-        DecodeEmojiToBytes::new(self)
-    }
-}
-
-impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
-    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<std::vec::IntoIter<u8>> {
-        self.into_bytes().into_iter().demojfuscate_byte_stream()
-    }
-}
-
-impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
-    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
-        self.bytes().into_iter().demojfuscate_byte_stream()
-    }
-}
-
-impl<I: Iterator<Item = char>>
-    IsEmojiRepresentation<
-        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
-    > for I
-{
-    fn demojfuscate_byte_stream(
-        self,
-    ) -> DecodeEmojiToBytes<
-        std::iter::FlatMap<I, std::vec::IntoIter<u8>, fn(char) -> std::vec::IntoIter<u8>>,
-    > {
-        self.flat_map(char_to_byte_iter as fn(char) -> std::vec::IntoIter<u8>)
-            .demojfuscate_byte_stream()
-    }
-}
-
-fn char_to_byte_iter(c: char) -> std::vec::IntoIter<u8> {
-    c.to_string().into_bytes().into_iter()
-}
-
-// demojfuscate_stream related stuff
+/// A struct that is used to lazily produce more values of A from a source of emoji.
 pub struct DemojfuscateIterator<A, I>
 where
     A: ConstructFromEmoji<A, I>,
@@ -316,7 +323,7 @@ where
     }
 }
 
-// implementations
+// ConstructFromEmoji implementations
 impl<I> ConstructFromEmoji<(), I> for ()
 where
     I: Iterator<Item = u8>,

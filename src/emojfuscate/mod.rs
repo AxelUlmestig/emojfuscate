@@ -1,6 +1,9 @@
 mod constants;
 mod demojfuscate;
 mod emojfuscate;
+mod util {
+    pub mod iterator_wrapper;
+}
 
 pub use constants::ByteInSequence;
 pub use demojfuscate::{
