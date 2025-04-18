@@ -227,10 +227,17 @@ where
             let emoji_value = match EMOJI_VALUES.get(&emoji) {
                 Some(x) => x,
                 None => {
+                    // We ignore white space, tabs and line break chars to make the CLI easier to
+                    // use
+                    let white_space_chars = [' ', '\r', '\n', '\t'];
+                    if white_space_chars.contains(&emoji) {
+                        continue;
+                    }
+
                     return Some(Err(FromEmojiError::InputIsNotAnEmoji(format!(
                         "Unexpected input character: {}",
                         emoji
-                    ))))
+                    ))));
                 }
             };
 

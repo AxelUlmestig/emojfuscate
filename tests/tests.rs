@@ -19,6 +19,26 @@ mod tests {
     }
 
     #[test]
+    fn emojfuscate_uuid_with_spaces() {
+        let original_message = uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8");
+        // let original_message : Uuid = Uuid::new_v4();
+        let mut emojified = original_message.clone().emojfuscate();
+
+        emojified.insert_str(10 * 4, " ");
+        emojified.insert_str(8 * 4, "\r");
+        emojified.insert_str(6 * 4, "\n");
+        emojified.insert_str(4 * 4, "\t");
+
+        let roundtrip_message = emojified.clone().demojfuscate();
+        assert_eq!(
+            roundtrip_message,
+            Ok(original_message),
+            "emojfuscated version: {}",
+            emojified
+        );
+    }
+
+    #[test]
     fn emojfuscate_tuple() {
         let original_message = (123u8, uuid::uuid!("67e55044-10b1-426f-9247-bb680e5fe0c8"));
         let emojified = original_message.clone().emojfuscate();
