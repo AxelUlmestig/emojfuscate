@@ -199,15 +199,14 @@ where
                 };
 
                 // The first bits of the first byte signify how long (in bytes) the UTF-8 character is.
-                // 0b10XXXXXX means a one byte character. 0b110XXXXX means a two byte character and so
-                // on up to four bytes.
-                let remaining_bytes_in_char = match b & 0b11110000 {
-                    0b10000000 => 0,
-                    0b11000000 => 1,
-                    0b11100000 => 2,
-                    0b11110000 => 3,
-                    _ => return Some(Err(FromEmojiError::InvalidUtf8)),
-                };
+                // 0b0XXXXXXX means a one byte character, 0b10XXXXXX means a two byte character,
+                // 0b110XXXXX means a three byte character and so on up to four bytes.
+                //
+                // By counting the leading ones in the byte we can deduce how many more trailing
+                // bytes there is in character we are currently decoding.
+                //
+                // Source: https://www.freecodecamp.org/news/what-is-utf-8-character-encoding/
+                let remaining_bytes_in_char = std::cmp::max(b.leading_ones() as usize, 1) - 1;
 
                 let mut input_bytes = vec![b];
                 let mut bytes_after_first: Vec<u8> =
