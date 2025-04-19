@@ -199,22 +199,22 @@ where
                 };
 
                 // The first bits of the first byte signify how long (in bytes) the UTF-8 character is.
-                // 0b0XXXXXXX means a one byte character, 0b10XXXXXX means a two byte character,
-                // 0b110XXXXX means a three byte character and so on up to four bytes.
+                // 0b0XXXXXXX means a one byte character, 0b110XXXXX means a two byte character,
+                // 0b1110XXXX means a three byte character and so on up to four bytes.
+                //
+                // Notice that 0X is zero and 110X is two, you would expect the pattern to be 10X,
+                // 110X or 0X, 10X. This is why we need to do catch the special case of just one
+                // byte characters that break the pattern.
                 //
                 // By counting the leading ones in the byte we can deduce how many more trailing
                 // bytes there is in character we are currently decoding.
                 //
-                // Source: https://www.freecodecamp.org/news/what-is-utf-8-character-encoding/
+                // Source: https://stackoverflow.com/questions/643694/what-is-the-difference-between-utf-8-and-unicode
                 let remaining_bytes_in_char = std::cmp::max(b.leading_ones() as usize, 1) - 1;
 
                 let mut input_bytes = vec![b];
                 let mut bytes_after_first: Vec<u8> =
                     self.iter.by_ref().take(remaining_bytes_in_char).collect();
-
-                if bytes_after_first.len() != remaining_bytes_in_char {
-                    return Some(Err(FromEmojiError::InvalidUtf8));
-                }
 
                 input_bytes.append(&mut bytes_after_first);
 
