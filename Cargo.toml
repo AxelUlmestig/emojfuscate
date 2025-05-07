@@ -17,10 +17,6 @@ path = "src/emojfuscate/mod.rs"
 [dev-dependencies]
 proptest = "1.0.0"
 
-[[bin]]
-name = "emojfuscate"
-path = "src/cli/main.rs"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
