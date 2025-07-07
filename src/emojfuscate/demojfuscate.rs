@@ -29,6 +29,19 @@ impl IsEmojiRepresentation<std::vec::IntoIter<u8>> for String {
     }
 }
 
+impl<'a> IsEmojiRepresentation<core::iter::Map<std::slice::Iter<'a, u8>, fn(&'a u8) -> u8>>
+    for &'a String
+{
+    fn demojfuscate_byte_stream(
+        self,
+    ) -> DecodeEmojiToBytes<core::iter::Map<std::slice::Iter<'a, u8>, fn(&'a u8) -> u8>> {
+        self.as_bytes()
+            .into_iter()
+            .map((|b| b.clone()) as fn(&u8) -> u8)
+            .demojfuscate_byte_stream()
+    }
+}
+
 impl<'a> IsEmojiRepresentation<core::str::Bytes<'a>> for &'a str {
     fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<core::str::Bytes<'a>> {
         self.bytes().into_iter().demojfuscate_byte_stream()
