@@ -68,9 +68,9 @@ mod tests {
 
     #[test]
     fn emojfuscate_infinite_streams() {
-        let source = std::iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
+        let mut source = std::iter::repeat("hello"); // infinite stream of String : Iterator<Item = String>
 
-        let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = source
+        let demojfuscated: Result<Vec<String>, emojfuscate::FromEmojiError> = (&mut source)
             .emojfuscate_stream() // infinite stream of emoji: Iterator<Item = char>
             .demojfuscate_stream() // infinite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>
             .take(3) // finite stream of hopefully String: Iterator<Item = Result<String, FromEmojiError>>

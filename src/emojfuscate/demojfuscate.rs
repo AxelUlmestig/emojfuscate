@@ -1,3 +1,4 @@
+use crate::util::iterator_wrapper::IteratorWrapper;
 use arrayvec::ArrayVec;
 use paste::paste;
 use std::str;
@@ -20,6 +21,12 @@ where
 impl<I: Iterator<Item = u8>> IsEmojiRepresentation<I> for I {
     fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<I> {
         DecodeEmojiToBytes::new(self)
+    }
+}
+
+impl<'a, I: Iterator<Item = u8>> IsEmojiRepresentation<IteratorWrapper<&'a mut I>> for &'a mut I {
+    fn demojfuscate_byte_stream(self) -> DecodeEmojiToBytes<IteratorWrapper<&'a mut I>> {
+        DecodeEmojiToBytes::new(IteratorWrapper { iter: self })
     }
 }
 
