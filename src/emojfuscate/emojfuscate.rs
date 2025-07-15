@@ -260,113 +260,141 @@ impl Emojfuscate<Once<ByteInSequence>> for u8 {
     }
 }
 
+impl Emojfuscate<Once<ByteInSequence>> for &u8 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteInSequence>> {
+        EncodeBytesAsEmoji::new(std::iter::once(ByteInSequence::Byte(self.clone())))
+    }
+}
+
 impl Emojfuscate<IntoIter<ByteInSequence, 2>> for u16 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 2>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 2>> for &u16 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 2>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 4>> for u32 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 4>> for &u32 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 8>> for u64 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 8>> for &u64 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 16>> for u128 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 16>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 16>> for &u128 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 16>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 1>> for i8 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 1>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 1>> for &i8 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 1>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 2>> for i16 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 2>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 2>> for &i16 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 2>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 4>> for i32 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 4>> for &i32 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 8>> for i64 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 8>> for &i64 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 16>> for i128 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 16>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 16>> for &i128 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 16>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 4>> for f32 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 4>> for &f32 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
 impl Emojfuscate<IntoIter<ByteInSequence, 8>> for f64 {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
-        EncodeBytesAsEmoji::new(
-            self.to_be_bytes()
-                .map(|b| ByteInSequence::Byte(b))
-                .into_iter(),
-        )
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 8>> for &f64 {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 8>> {
+        EncodeBytesAsEmoji::new(self.to_be_bytes().map(ByteInSequence::Byte).into_iter())
     }
 }
 
