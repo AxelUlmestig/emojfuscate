@@ -493,6 +493,17 @@ impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> fo
     }
 }
 
+impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> for &Uuid {
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> {
+        return self
+            .into_bytes()
+            .into_iter()
+            .emojfuscate_byte_stream_no_start_or_stop();
+    }
+}
+
 impl<A, IA, const S: usize> Emojfuscate<FlatMap<std::array::IntoIter<A, S>, IA, fn(A) -> IA>>
     for [A; S]
 where
