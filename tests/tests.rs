@@ -89,19 +89,19 @@ mod tests {
     proptest! {
         #[test]
         fn emojfuscate_bool(original_message : bool) {
-            let emojified = original_message.clone().emojfuscate();
+            let emojified = original_message.emojfuscate();
             let roundtrip_message = (&emojified).demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
 
         fn emojfuscate_unit(original_message : ()) {
-            let emojified = original_message.clone().emojfuscate();
+            let emojified = original_message.emojfuscate();
             let roundtrip_message = (&emojified).demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }
 
         fn emojfuscate_char(original_message : char) {
-            let emojified = original_message.clone().emojfuscate();
+            let emojified = original_message.emojfuscate();
             let roundtrip_message = (&emojified).demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }

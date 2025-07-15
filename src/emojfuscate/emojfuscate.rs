@@ -242,15 +242,33 @@ impl Emojfuscate<Empty<ByteInSequence>> for () {
     }
 }
 
+impl Emojfuscate<Empty<ByteInSequence>> for &() {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Empty<ByteInSequence>> {
+        EncodeBytesAsEmoji::new(empty::<ByteInSequence>())
+    }
+}
+
 impl Emojfuscate<Once<ByteInSequence>> for bool {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteInSequence>> {
         <bool as Into<u8>>::into(self).emojfuscate_stream()
     }
 }
 
+impl Emojfuscate<Once<ByteInSequence>> for &bool {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<Once<ByteInSequence>> {
+        <bool as Into<u8>>::into(self.clone()).emojfuscate_stream()
+    }
+}
+
 impl Emojfuscate<IntoIter<ByteInSequence, 4>> for char {
     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
         (self as u32).emojfuscate_stream()
+    }
+}
+
+impl Emojfuscate<IntoIter<ByteInSequence, 4>> for &char {
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IntoIter<ByteInSequence, 4>> {
+        (self.clone() as u32).emojfuscate_stream()
     }
 }
 
