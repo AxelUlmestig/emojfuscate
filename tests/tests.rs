@@ -110,7 +110,7 @@ mod tests {
         #[test]
         fn emojfuscate_string(original_message in "\\PC*") {
             // let original_message = "Karin är söt <3".to_string();
-            let emojified = original_message.clone().emojfuscate();
+            let emojified = (&original_message).emojfuscate();
             let roundtrip_message = (&emojified).demojfuscate();
             assert_eq!(roundtrip_message, Ok(original_message), "emojfuscated version: {}", emojified);
         }

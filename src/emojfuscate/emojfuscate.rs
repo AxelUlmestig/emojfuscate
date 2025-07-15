@@ -456,6 +456,32 @@ impl
     }
 }
 
+impl<'a>
+    Emojfuscate<
+        Chain<
+            Chain<
+                Once<ByteInSequence>,
+                Map<std::iter::Copied<std::slice::Iter<'a, u8>>, fn(u8) -> ByteInSequence>,
+            >,
+            Once<ByteInSequence>,
+        >,
+    > for &'a String
+{
+    fn emojfuscate_stream(
+        self,
+    ) -> EncodeBytesAsEmoji<
+        Chain<
+            Chain<
+                Once<ByteInSequence>,
+                Map<std::iter::Copied<std::slice::Iter<'a, u8>>, fn(u8) -> ByteInSequence>,
+            >,
+            Once<ByteInSequence>,
+        >,
+    > {
+        self.as_bytes().iter().copied().emojfuscate_byte_stream()
+    }
+}
+
 impl Emojfuscate<Map<std::array::IntoIter<u8, 16>, fn(u8) -> ByteInSequence>> for Uuid {
     fn emojfuscate_stream(
         self,
