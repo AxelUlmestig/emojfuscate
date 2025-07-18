@@ -730,3 +730,109 @@ impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 
 impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22);
 impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23);
 impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23, A24 I24);
+
+/// Generates implementations that looks like this:
+///
+/// ```
+/// impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>>> for &(A, B)
+/// where
+///     for<'a> &'a A: Emojfuscate<I1>,
+///     for<'a> &'a B: Emojfuscate<I2>,
+///     I1: Iterator<Item = ByteInSequence>,
+///     I2: Iterator<Item = ByteInSequence>,
+/// {
+///     fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>>> {
+///         let (a, b) = self;
+///         return a
+///             .emojfuscate_stream()
+///             .chain_emoji_bytes(b.emojfuscate_stream())
+///             .bypass_future_trait_implementation_compiler_error();
+///     }
+/// }
+/// ```
+macro_rules! impl_emojfuscate_for_tuple_reference {
+    ($first_type:ident $first_iter:ident, $($type:ident $iter:ident),+) => {
+        paste! {
+            impl<$first_type, $($type),+, $first_iter, $($iter),+>
+                Emojfuscate<chain_type!($first_iter $($iter)+)>
+                for &($first_type, $($type),+)
+            where
+                for<'a> &'a $first_type: Emojfuscate<$first_iter>,
+                $(for<'a> &'a $type: Emojfuscate<$iter>),+,
+                $first_iter: Iterator<Item = ByteInSequence>,
+                $($iter: Iterator<Item = ByteInSequence>),+
+            {
+
+                fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<chain_type!($first_iter $($iter)+)> {
+                    let ([<$first_type:lower>], $([<$type:lower>]),+) = self;
+
+                    return [<$first_type:lower>].emojfuscate_stream()
+                    $(.chain_emoji_bytes([<$type:lower>].emojfuscate_stream()))+
+                    ;
+                }
+            }
+        }
+    }
+}
+
+
+impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>>> for &(A, B)
+where
+    for<'a> &'a A: Emojfuscate<I1>,
+    for<'a> &'a B: Emojfuscate<I2>,
+    I1: Iterator<Item = ByteInSequence>,
+    I2: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<I1, I2>>> {
+        let (a, b) = self;
+        return a
+            .emojfuscate_stream()
+            .chain_emoji_bytes(b.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
+    }
+}
+
+
+impl<A, B, C, IA, IB, IC> Emojfuscate<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> for &(A, B, C)
+where
+    for<'a> &'a A: Emojfuscate<IA>,
+    for<'a> &'a B: Emojfuscate<IB>,
+    for<'a> &'a C: Emojfuscate<IC>,
+    IA: Iterator<Item = ByteInSequence>,
+    IB: Iterator<Item = ByteInSequence>,
+    IC: Iterator<Item = ByteInSequence>,
+{
+    fn emojfuscate_stream(self) -> EncodeBytesAsEmoji<IteratorWrapper<Chain<Chain<IA, IB>, IC>>> {
+        let (a, b, c) = self;
+        return a
+            .emojfuscate_stream()
+            .chain_emoji_bytes(b.emojfuscate_stream())
+            .chain_emoji_bytes(c.emojfuscate_stream())
+            .bypass_future_trait_implementation_compiler_error();
+    }
+}
+
+
+// impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2);
+// impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23);
+impl_emojfuscate_for_tuple_reference!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 I8, A9 I9, A10 I10, A11 I11, A12 I12, A13 I13, A14 I14, A15 I15, A16 I16, A17 I17, A18 I18, A19 I19, A20 I20, A21 I21, A22 I22, A23 I23, A24 I24);
