@@ -733,7 +733,7 @@ impl_emojfuscate_for_tuple!(A1 I1, A2 I2, A3 I3, A4 I4, A5 I5, A6 I6, A7 I7, A8 
 
 /// Generates implementations that looks like this:
 ///
-/// ```
+/// ```ignore
 /// impl<A, B, I1, I2> Emojfuscate<IteratorWrapper<Chain<I1, I2>>> for &(A, B)
 /// where
 ///     for<'a> &'a A: Emojfuscate<I1>,
